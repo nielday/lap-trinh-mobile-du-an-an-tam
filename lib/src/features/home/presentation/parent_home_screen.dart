@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import 'parent_medication_reminder_screen.dart';
+import 'parent_task_list_screen.dart';
 
 /// Parent home screen - Ultra simple interface for elderly users
-/// Features 3 large buttons: SOS, Check-in, Call Child
-/// Follows FR2 requirements from specification
+/// Based on design mockup with weather, health stats, tasks, and family photos
 class ParentHomeScreen extends StatelessWidget {
   const ParentHomeScreen({super.key});
 
@@ -13,151 +14,78 @@ class ParentHomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // Header with greeting
-              _buildHeader(),
-              
-              const SizedBox(height: 40),
-              
-              // Main buttons
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // SOS Button (FR2.2)
-                    _buildSOSButton(context),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Check-in Button (FR2.3)
-                    _buildCheckInButton(context),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Call Child Button (FR2.4)
-                    _buildCallChildButton(context),
-                  ],
-                ),
-              ),
-              
-              // Time display
-              _buildTimeDisplay(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.primaryGreen, width: 3),
-          ),
-          child: const Icon(
-            Icons.person,
-            color: AppColors.primaryGreen,
-            size: 32,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Xin chào',
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 20,
-                ),
+              // Weather and date header
+              _buildWeatherHeader(),
+              
+              const SizedBox(height: 20),
+              
+              // Health stats cards
+              _buildHealthStats(),
+              
+              const SizedBox(height: 20),
+              
+              // Action buttons (Call and Message)
+              _buildActionButtons(context),
+              
+              const SizedBox(height: 20),
+              
+              // Completed button
+              _buildCompletedButton(context),
+              
+              const SizedBox(height: 24),
+              
+              // Tasks section
+              _buildTasksSection(context),
+              
+              const SizedBox(height: 24),
+              
+              // Family album section
+              _buildFamilyAlbumSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundWhite,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Weather info
+          Row(
+            children: [
+              const Icon(
+                Icons.wb_sunny,
+                color: AppColors.accentOrange,
+                size: 32,
               ),
+              const SizedBox(width: 12),
               Text(
-                'Bố/Mẹ',
+                '24°C',
                 style: AppTextStyles.heading3.copyWith(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w700,
-                  fontSize: 28,
                 ),
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSOSButton(BuildContext context) {
-    return _LargeButton(
-      icon: Icons.emergency,
-      label: 'KHẨN CẤP',
-      subtitle: 'Bấm khi cần trợ giúp ngay',
-      backgroundColor: AppColors.error,
-      onTap: () {
-        _showSOSConfirmation(context);
-      },
-    );
-  }
-
-  Widget _buildCheckInButton(BuildContext context) {
-    return _LargeButton(
-      icon: Icons.check_circle,
-      label: 'ĐÃ UỐNG THUỐC',
-      subtitle: 'Bấm sau khi uống thuốc',
-      backgroundColor: AppColors.success,
-      onTap: () {
-        _showCheckInConfirmation(context);
-      },
-    );
-  }
-
-  Widget _buildCallChildButton(BuildContext context) {
-    return _LargeButton(
-      icon: Icons.phone,
-      label: 'GỌI CON',
-      subtitle: 'Nhờ con gọi lại khi rảnh',
-      backgroundColor: AppColors.info,
-      onTap: () {
-        _showCallRequestConfirmation(context);
-      },
-    );
-  }
-
-  Widget _buildTimeDisplay() {
-    final now = DateTime.now();
-    final hour = now.hour.toString().padLeft(2, '0');
-    final minute = now.minute.toString().padLeft(2, '0');
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.indicatorInactive),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.access_time,
-            color: AppColors.primaryGreen,
-            size: 32,
-          ),
-          const SizedBox(width: 12),
+          // Date
           Text(
-            '$hour:$minute',
-            style: AppTextStyles.heading2.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 36,
+            'Thứ Sáu, 13/6',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -165,76 +93,203 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  void _showSOSConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundWhite,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+  Widget _buildHealthStats() {
+    return Row(
+      children: [
+        Expanded(
+          child: _HealthStatCard(
+            icon: Icons.favorite,
+            iconColor: AppColors.error,
+            value: '72 bpm',
+            label: 'Nhịp tim',
+          ),
         ),
-        contentPadding: const EdgeInsets.all(32),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _HealthStatCard(
+            icon: Icons.show_chart,
+            iconColor: AppColors.accentOrange,
+            value: '120/80',
+            label: 'Huyết áp',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _HealthStatCard(
+            icon: Icons.close,
+            iconColor: AppColors.textSecondary,
+            value: 'N/A',
+            label: 'Đường',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.phone,
+            label: 'Gọi điện',
+            backgroundColor: AppColors.secondaryNavy,
+            onTap: () {
+              // TODO: Implement call functionality
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.message,
+            label: 'Nhắn tin',
+            backgroundColor: AppColors.secondaryNavy,
+            onTap: () {
+              // TODO: Implement message functionality
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompletedButton(BuildContext context) {
+    return Material(
+      color: AppColors.primaryGreen,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          _showCheckInConfirmation(context);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'Đã hoàn thành',
+            style: AppTextStyles.buttonMedium.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTasksSection(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.error,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.emergency,
-                color: AppColors.textWhite,
-                size: 48,
-              ),
-            ),
-            const SizedBox(height: 24),
             Text(
-              'GỌI KHẨN CẤP?',
-              style: AppTextStyles.heading3.copyWith(
+              'Việc cần làm sắp tới',
+              style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 28,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Sẽ gọi điện cho con ngay lập tức',
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 20,
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ParentTaskListScreen(),
+                  ),
+                );
+              },
+              child: Text(
+                'Xem tất cả',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.primaryGreen,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: _DialogButton(
-                    label: 'HỦY',
-                    backgroundColor: AppColors.textLight,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _DialogButton(
-                    label: 'GỌI NGAY',
-                    backgroundColor: AppColors.error,
-                    onTap: () {
-                      Navigator.pop(context);
-                      // TODO: Implement SOS call
-                    },
-                  ),
-                ),
-              ],
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        _TaskItem(
+          icon: Icons.medication,
+          iconColor: AppColors.success,
+          title: 'Thuốc Huyết áp',
+          subtitle: 'Đã hoàn thành',
+          isCompleted: true,
+          onTap: () {},
+        ),
+        const SizedBox(height: 8),
+        _TaskItem(
+          icon: Icons.visibility,
+          iconColor: AppColors.accentOrange,
+          title: 'Đi khám mắt',
+          subtitle: '14:00 - Hôm nay',
+          isCompleted: false,
+          onTap: () {},
+        ),
+        const SizedBox(height: 8),
+        _TaskItem(
+          icon: Icons.fitness_center,
+          iconColor: AppColors.secondaryNavy,
+          title: 'Tập thể dục',
+          subtitle: '07:00 - Ngày mai',
+          isCompleted: false,
+          onTap: () {},
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFamilyAlbumSection() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'album ảnh gia đình',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // TODO: Navigate to full album
+              },
+              child: Text(
+                'Xem tất cả',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.primaryGreen,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _FamilyPhotoCard(
+                imageUrl: 'https://via.placeholder.com/150',
+                caption: 'Ảnh ông bà',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _FamilyPhotoCard(
+                imageUrl: 'https://via.placeholder.com/150',
+                caption: 'Ảnh gia đình sum họp',
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -269,86 +324,39 @@ class ParentHomeScreen extends StatelessWidget {
               style: AppTextStyles.heading3.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w700,
-                fontSize: 28,
+                fontSize: 24,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Text(
-              'Con sẽ biết bố/mẹ đã uống thuốc',
+              'Công việc đã được hoàn thành',
               style: AppTextStyles.bodyLarge.copyWith(
                 color: AppColors.textSecondary,
-                fontSize: 20,
+                fontSize: 16,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            _DialogButton(
-              label: 'ĐÓNG',
-              backgroundColor: AppColors.success,
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Send check-in notification
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCallRequestConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundWhite,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        contentPadding: const EdgeInsets.all(32),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.info,
-                shape: BoxShape.circle,
+            Material(
+              color: AppColors.success,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: () => Navigator.pop(context),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'ĐÓNG',
+                    style: AppTextStyles.buttonLarge.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.phone,
-                color: AppColors.textWhite,
-                size: 48,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'ĐÃ GỬI YÊU CẦU!',
-              style: AppTextStyles.heading3.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 28,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Con sẽ gọi lại khi rảnh',
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 20,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            _DialogButton(
-              label: 'ĐÓNG',
-              backgroundColor: AppColors.info,
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Send call request notification
-              },
             ),
           ],
         ),
@@ -357,20 +365,65 @@ class ParentHomeScreen extends StatelessWidget {
   }
 }
 
-/// Large button widget for parent interface
-/// Extra large size for elderly users with accessibility needs
-class _LargeButton extends StatelessWidget {
-  const _LargeButton({
+/// Health stat card widget
+class _HealthStatCard extends StatelessWidget {
+  const _HealthStatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundWhite,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: iconColor, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Action button widget
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
     required this.icon,
     required this.label,
-    required this.subtitle,
     required this.backgroundColor,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final String subtitle;
   final Color backgroundColor;
   final VoidCallback onTap;
 
@@ -378,41 +431,23 @@ class _LargeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: backgroundColor,
-      borderRadius: BorderRadius.circular(24),
-      elevation: 4,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                color: AppColors.textWhite,
-                size: 64,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                label,
-                style: AppTextStyles.heading3.copyWith(
-                  color: AppColors.textWhite,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 28,
-                  letterSpacing: 1,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              Icon(icon, color: AppColors.textWhite, size: 28),
               const SizedBox(height: 8),
               Text(
-                subtitle,
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: AppColors.textWhite.withValues(alpha: 0.9),
-                  fontSize: 18,
+                label,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textWhite,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -422,38 +457,131 @@ class _LargeButton extends StatelessWidget {
   }
 }
 
-/// Dialog button widget
-class _DialogButton extends StatelessWidget {
-  const _DialogButton({
-    required this.label,
-    required this.backgroundColor,
+/// Task item widget
+class _TaskItem extends StatelessWidget {
+  const _TaskItem({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.isCompleted,
     required this.onTap,
   });
 
-  final String label;
-  final Color backgroundColor;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool isCompleted;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(16),
+      color: AppColors.backgroundWhite,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Text(
-            label,
-            style: AppTextStyles.buttonLarge.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              if (isCompleted)
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.success,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: AppColors.textWhite,
+                    size: 16,
+                  ),
+                )
+              else
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: AppColors.textWhite, size: 24),
+                ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: isCompleted
+                            ? AppColors.success
+                            : AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Family photo card widget
+class _FamilyPhotoCard extends StatelessWidget {
+  const _FamilyPhotoCard({
+    required this.imageUrl,
+    required this.caption,
+  });
+
+  final String imageUrl;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 120,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundWhite,
+            borderRadius: BorderRadius.circular(12),
+            image: DecorationImage(
+              image: NetworkImage(imageUrl),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          caption,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }
