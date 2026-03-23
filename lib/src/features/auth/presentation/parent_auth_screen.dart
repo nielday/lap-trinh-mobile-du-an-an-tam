@@ -4,8 +4,6 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../home/presentation/parent_home_screen.dart';
 import '../../home/presentation/parent_medication_reminder_screen.dart';
-import '../../home/presentation/parent_sos_screen.dart';
-import '../../home/presentation/parent_incoming_call_screen.dart';
 import '../../home/presentation/parent_settings_screen.dart';
 
 /// Parent auth screen - Simple authentication for elderly users
