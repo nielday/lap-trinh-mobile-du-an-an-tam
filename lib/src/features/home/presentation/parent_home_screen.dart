@@ -3,6 +3,8 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import 'parent_medication_reminder_screen.dart';
 import 'parent_task_list_screen.dart';
+import 'parent_settings_screen.dart';
+import 'parent_calling_screen.dart';
 
 /// Parent home screen - Ultra simple interface for elderly users
 /// Based on design mockup with weather, health stats, tasks, and family photos
@@ -13,6 +15,35 @@ class ParentHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
+      appBar: AppBar(
+        backgroundColor: AppColors.backgroundLight,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.settings,
+              color: AppColors.textPrimary,
+              size: 28,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ParentSettingsScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -214,9 +245,13 @@ class ParentHomeScreen extends StatelessWidget {
               icon: Icons.person,
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Make call to child
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đang gọi cho Con...')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ParentCallingScreen(
+                      callerName: 'Con',
+                    ),
+                  ),
                 );
               },
             ),
@@ -226,9 +261,13 @@ class ParentHomeScreen extends StatelessWidget {
               icon: Icons.medical_services,
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Make call to doctor
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đang gọi cho Bác sĩ...')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ParentCallingScreen(
+                      callerName: 'Bác sĩ',
+                    ),
+                  ),
                 );
               },
             ),

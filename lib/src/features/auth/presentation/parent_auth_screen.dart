@@ -110,7 +110,7 @@ class ParentAuthScreen extends StatelessWidget {
               
               const SizedBox(height: 24),
               
-              // Demo buttons for testing
+              // Demo buttons for testing (simplified)
               Column(
                 children: [
                   _DemoButton(
@@ -125,36 +125,6 @@ class ParentAuthScreen extends StatelessWidget {
                             medicationName: 'Thuốc Huyết Áp',
                             dosage: '1 viên',
                             scheduledTime: '8:00 sáng',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _DemoButton(
-                    label: 'Màn hình SOS',
-                    icon: Icons.emergency,
-                    color: AppColors.error,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ParentSOSScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _DemoButton(
-                    label: 'Cuộc gọi đến',
-                    icon: Icons.phone_callback,
-                    color: AppColors.success,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ParentIncomingCallScreen(
-                            callerName: 'Bố',
                           ),
                         ),
                       );
