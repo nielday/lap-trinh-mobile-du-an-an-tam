@@ -4,6 +4,7 @@ import '../../../common_widgets/primary_button.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import 'child_auth_screen.dart';
+import 'parent_auth_screen.dart';
 
 /// Role selection screen - first screen when opening the app
 /// Users select whether they are "Người thân" (Caregiver) or "Cha/mẹ" (Elder)
@@ -20,8 +21,12 @@ class RoleSelectionScreen extends StatelessWidget {
   }
 
   void _onElderPressed(BuildContext context) {
-    // TODO: Navigate to Elder auth screen
-    debugPrint('Navigate to Elder Auth Screen');
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const ParentAuthScreen(),
+      ),
+    );
   }
 
   @override
