@@ -127,30 +127,242 @@ class ParentHomeScreen extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.phone,
-            label: 'Gọi điện',
-            backgroundColor: AppColors.secondaryNavy,
-            onTap: () {
-              // TODO: Implement call functionality
-            },
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.phone,
+                label: 'Gọi điện',
+                backgroundColor: AppColors.secondaryNavy,
+                onTap: () {
+                  _showCallDialog(context);
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.message,
+                label: 'Nhắn tin',
+                backgroundColor: AppColors.secondaryNavy,
+                onTap: () {
+                  // TODO: Implement message functionality
+                },
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.message,
-            label: 'Nhắn tin',
-            backgroundColor: AppColors.secondaryNavy,
+        const SizedBox(height: 12),
+        // SOS Button
+        Material(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
             onTap: () {
-              // TODO: Implement message functionality
+              _showSOSConfirmation(context);
             },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.emergency, color: AppColors.textWhite, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    'KHẨN CẤP - SOS',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textWhite,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  void _showCallDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Gọi điện cho ai?',
+          style: AppTextStyles.heading3.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _CallContactButton(
+              name: 'Con',
+              icon: Icons.person,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Make call to child
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đang gọi cho Con...')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _CallContactButton(
+              name: 'Bác sĩ',
+              icon: Icons.medical_services,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Make call to doctor
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đang gọi cho Bác sĩ...')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _CallContactButton(
+              name: 'Người thân khác',
+              icon: Icons.people,
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Show contact list
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Hủy',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSOSConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        contentPadding: const EdgeInsets.all(32),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.emergency,
+                color: AppColors.textWhite,
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'KHẨN CẤP!',
+              style: AppTextStyles.heading3.copyWith(
+                color: AppColors.error,
+                fontWeight: FontWeight.w900,
+                fontSize: 28,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Gọi ngay cho Con và\ngửi thông báo khẩn cấp?',
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 18,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: Material(
+                    color: AppColors.textLight,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Text(
+                          'HỦY',
+                          style: AppTextStyles.buttonLarge.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Material(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        // TODO: Make emergency call and send notification
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đang gọi khẩn cấp và gửi thông báo...'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Text(
+                          'GỌI NGAY',
+                          style: AppTextStyles.buttonLarge.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -359,6 +571,55 @@ class ParentHomeScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Call contact button widget
+class _CallContactButton extends StatelessWidget {
+  const _CallContactButton({
+    required this.name,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String name;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primaryGreen,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.textWhite, size: 28),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  name,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textWhite,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.phone,
+                color: AppColors.textWhite,
+                size: 24,
+              ),
+            ],
+          ),
         ),
       ),
     );

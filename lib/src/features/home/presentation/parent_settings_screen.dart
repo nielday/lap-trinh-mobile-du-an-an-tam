@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import '../../settings/presentation/parent_account_settings_screen.dart';
+import '../../settings/presentation/parent_family_link_screen.dart';
 
 /// Parent settings screen - Configuration and preferences
 class ParentSettingsScreen extends StatelessWidget {
@@ -83,13 +85,27 @@ class ParentSettingsScreen extends StatelessWidget {
           _SettingItem(
             icon: Icons.person,
             title: 'Tài khoản và bảo mật',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ParentAccountSettingsScreen(),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           _SettingItem(
             icon: Icons.people,
             title: 'Liên kết gia đình',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ParentFamilyLinkScreen(),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           _SettingItem(
