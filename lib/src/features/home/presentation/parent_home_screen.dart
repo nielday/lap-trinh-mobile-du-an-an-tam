@@ -5,6 +5,14 @@ import 'parent_medication_reminder_screen.dart';
 import 'parent_task_list_screen.dart';
 import 'parent_settings_screen.dart';
 import 'parent_calling_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../../../providers/medication_provider.dart';
+import '../../../providers/health_metric_provider.dart';
+import '../../../providers/appointment_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../repositories/user_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Parent home screen - Ultra simple interface for elderly users
 /// Based on design mockup with weather, health stats, tasks, and family photos
@@ -18,14 +26,7 @@ class ParentHomeScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.backgroundLight,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textPrimary,
-            size: 28,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(
@@ -56,7 +57,7 @@ class ParentHomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
               
               // Health stats cards
-              _buildHealthStats(),
+              _buildHealthStats(context),
               
               const SizedBox(height: 20),
               
@@ -64,11 +65,7 @@ class ParentHomeScreen extends StatelessWidget {
               _buildActionButtons(context),
               
               const SizedBox(height: 20),
-              
-              // Completed button
-              _buildCompletedButton(context),
-              
-              const SizedBox(height: 24),
+              // Completed button đã bị loại bỏ theo yêu cầu báo cáo đơn lẻ
               
               // Tasks section
               _buildTasksSection(context),
@@ -114,7 +111,7 @@ class ParentHomeScreen extends StatelessWidget {
           ),
           // Date
           Text(
-            'Thứ Sáu, 13/6',
+            DateFormat('EEEE, d/M', 'vi_VN').format(DateTime.now()),
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -124,14 +121,17 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthStats() {
+  Widget _buildHealthStats(BuildContext context) {
+    final metricProvider = context.watch<HealthMetricProvider>();
+    final metric = metricProvider.latestMetric;
+
     return Row(
       children: [
         Expanded(
           child: _HealthStatCard(
             icon: Icons.favorite,
             iconColor: AppColors.error,
-            value: '72 bpm',
+            value: metric?.heartRate != null ? '${metric!.heartRate} bpm' : 'N/A',
             label: 'Nhịp tim',
           ),
         ),
@@ -140,17 +140,17 @@ class ParentHomeScreen extends StatelessWidget {
           child: _HealthStatCard(
             icon: Icons.show_chart,
             iconColor: AppColors.accentOrange,
-            value: '120/80',
+            value: metric?.bloodPressure ?? 'N/A',
             label: 'Huyết áp',
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _HealthStatCard(
-            icon: Icons.close,
+            icon: Icons.monitor_weight_outlined,
             iconColor: AppColors.textSecondary,
-            value: 'N/A',
-            label: 'Đường',
+            value: metric?.weight != null ? '${metric!.weight} kg' : 'N/A',
+            label: 'Cân nặng',
           ),
         ),
       ],
@@ -405,32 +405,92 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompletedButton(BuildContext context) {
-    return Material(
-      color: AppColors.primaryGreen,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {
-          _showCheckInConfirmation(context);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Text(
-            'Đã hoàn thành',
-            style: AppTextStyles.buttonMedium.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    );
-  }
+  // (Đã xóa _buildCompletedButton theo yêu cầu sử dụng checkbox cụ thể)
 
   Widget _buildTasksSection(BuildContext context) {
+    final medProvider = context.watch<MedicationProvider>();
+    final apptProvider = context.watch<AppointmentProvider>();
+    
+    final tasks = <Widget>[];
+
+    // Lấy thuốc hôm nay
+    if (medProvider.medications.isNotEmpty) {
+      for (final med in medProvider.medications.take(3)) {
+        final checkIn = medProvider.todayCheckIns.where((c) => c.medicationId == med.id).firstOrNull;
+        final isCompleted = checkIn?.status == 'completed';
+        
+        IconData icon = Icons.medication;
+        Color color = const Color(0xFF7E57C2); // Tím
+        if (med.type == 'Bữa ăn') {
+          icon = Icons.restaurant;
+          color = const Color(0xFF66BB6A);
+        } else if (med.type == 'Hoạt động') {
+          icon = Icons.directions_walk;
+          color = const Color(0xFF42A5F5);
+        }
+
+        tasks.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _TaskItem(
+              icon: icon,
+              iconColor: isCompleted ? AppColors.success : color,
+              title: med.name,
+              subtitle: isCompleted ? 'Đã hoàn thành' : '${med.time} - Hôm nay',
+              isCompleted: isCompleted,
+              onTap: () {
+                if (!isCompleted) {
+                  _showCheckInConfirmation(context, med: med, medProvider: medProvider, authProvider: context.read<AuthProvider>());
+                }
+              },
+            ),
+          ),
+        );
+      }
+    }
+
+    // Lấy lịch khám sắp tới
+    if (apptProvider.appointments.isNotEmpty && tasks.length < 5) {
+      for (final appt in apptProvider.appointments.take(2)) {
+        final daysLeft = appt.date.difference(DateTime.now()).inDays;
+        final timeStr = daysLeft == 0 ? 'Hôm nay' : daysLeft == 1 ? 'Ngày mai' : 'Còn $daysLeft ngày';
+        
+        final isCompleted = appt.status == 'completed';
+        
+        tasks.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _TaskItem(
+              icon: Icons.calendar_today,
+              iconColor: isCompleted ? AppColors.success : AppColors.accentOrange,
+              title: appt.title,
+              subtitle: isCompleted ? 'Đã hoàn thành' : timeStr,
+              isCompleted: isCompleted,
+              onTap: () {
+                if (!isCompleted) {
+                  _showAppointmentConfirmation(context, appt: appt);
+                }
+              },
+            ),
+          ),
+        );
+      }
+    }
+
+    if (tasks.isEmpty) {
+      tasks.add(
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Không có công việc nào sắp tới.',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         Row(
@@ -464,32 +524,7 @@ class ParentHomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        _TaskItem(
-          icon: Icons.medication,
-          iconColor: AppColors.success,
-          title: 'Thuốc Huyết áp',
-          subtitle: 'Đã hoàn thành',
-          isCompleted: true,
-          onTap: () {},
-        ),
-        const SizedBox(height: 8),
-        _TaskItem(
-          icon: Icons.visibility,
-          iconColor: AppColors.accentOrange,
-          title: 'Đi khám mắt',
-          subtitle: '14:00 - Hôm nay',
-          isCompleted: false,
-          onTap: () {},
-        ),
-        const SizedBox(height: 8),
-        _TaskItem(
-          icon: Icons.fitness_center,
-          iconColor: AppColors.secondaryNavy,
-          title: 'Tập thể dục',
-          subtitle: '07:00 - Ngày mai',
-          isCompleted: false,
-          onTap: () {},
-        ),
+        ...tasks,
       ],
     );
   }
@@ -544,75 +579,155 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  void _showCheckInConfirmation(BuildContext context) {
-    showDialog(
+  void _showCheckInConfirmation(BuildContext context, {dynamic med, required MedicationProvider medProvider, required AuthProvider authProvider}) async {
+    final parentId = authProvider.effectiveParentId;
+    if (parentId == null || med == null) return;
+
+    if (!context.mounted) return;
+
+    // HIỂN THỊ HỘP THOẠI HỎI XÁC NHẬN TRƯỚC!
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.backgroundWhite,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Xác nhận uống thuốc',
+          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary, fontSize: 22),
+          textAlign: TextAlign.center,
         ),
-        contentPadding: const EdgeInsets.all(32),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.success,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check,
-                color: AppColors.textWhite,
-                size: 48,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'ĐÃ GHI NHẬN!',
-              style: AppTextStyles.heading3.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 24,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Công việc đã được hoàn thành',
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            Material(
-              color: AppColors.success,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                onTap: () => Navigator.pop(context),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'ĐÓNG',
-                    style: AppTextStyles.buttonLarge.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        content: Text(
+          'Bố/Mẹ ĐÃ uống thuốc "${med.name}" rồi phải không ạ?',
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary, fontSize: 18),
+          textAlign: TextAlign.center,
         ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // HỦY
+            child: Text(
+              'CHƯA UỐNG',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textLight, fontSize: 18),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true), // ĐÃ UỐNG
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'ĐÃ UỐNG',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textWhite, fontSize: 18),
+            ),
+          ),
+        ],
       ),
     );
+
+    // KHI ẤN ĐÃ UỐNG THÌ MỚI GHI LÊN FIREBASE
+    if (confirm == true) {
+      try {
+        await FirebaseFirestore.instance.collection('checkIns').add({
+          'medicationId': med.id,
+          'parentId': parentId,
+          'status': 'completed',
+          'timestamp': Timestamp.now(), // Sử dụng thời gian thực để bên máy con cập nhật ngay lập tức
+        });
+
+        if (context.mounted) {
+          // Hiển thị thông báo thành công nhanh bằng Snackbar (ko cần che cả màn hình làm mất thời gian)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tuyệt vời! Đã Ghi nhận hoàn thành thành công.'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('check in error: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khi ghi nhận: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
+
+    // (Phần dialog thành công cũ che màn hình đã bị loại bỏ vì giờ xài Snackbar)
+  }
+
+  void _showAppointmentConfirmation(BuildContext context, {required dynamic appt}) async {
+    if (!context.mounted) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Xác nhận khám bệnh',
+          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary, fontSize: 22),
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'Bố/Mẹ ĐÃ đi khám "${appt.title}" rồi phải không ạ?',
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary, fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // HỦY
+            child: Text(
+              'CHƯA ĐI',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textLight, fontSize: 18),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true), // ĐÃ ĐI
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'ĐÃ KHÁM',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textWhite, fontSize: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await FirebaseFirestore.instance.collection('appointments').doc(appt.id).update({
+          'status': 'completed',
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tuyệt vời! Đã ghi nhận đi khám thành công.'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('appt check in error: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khi cập nhật: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
   }
 }
 
@@ -837,6 +952,25 @@ class _TaskItem extends StatelessWidget {
                   ],
                 ),
               ),
+              if (!isCompleted)
+                IconButton(
+                  onPressed: onTap,
+                  icon: const Icon(
+                    Icons.radio_button_unchecked,
+                    color: AppColors.primaryGreen,
+                    size: 32,
+                  ),
+                  tooltip: 'Đánh dấu hoàn thành',
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.only(right: 8.0),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: AppColors.success,
+                    size: 32,
+                  ),
+                ),
             ],
           ),
         ),
@@ -864,10 +998,9 @@ class _FamilyPhotoCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.backgroundWhite,
             borderRadius: BorderRadius.circular(12),
-            image: DecorationImage(
-              image: NetworkImage(imageUrl),
-              fit: BoxFit.cover,
-            ),
+          ),
+          child: const Center(
+            child: Icon(Icons.photo, color: AppColors.textSecondary, size: 48),
           ),
         ),
         const SizedBox(height: 8),

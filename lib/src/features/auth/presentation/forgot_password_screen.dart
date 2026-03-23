@@ -4,7 +4,6 @@ import '../../../common_widgets/mascot_avatar.dart';
 import '../../../common_widgets/primary_button.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../theme/app_colors.dart';
-import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import 'privacy_policy_screen.dart';
 

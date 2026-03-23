@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../models/appointment_model.dart';
+import '../../../providers/appointment_provider.dart';
+import '../../../repositories/appointment_repository.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import 'add_appointment_screen.dart';
@@ -6,8 +10,45 @@ import 'add_appointment_screen.dart';
 class AppointmentScheduleScreen extends StatelessWidget {
   const AppointmentScheduleScreen({super.key});
 
+  String _weekdayName(int weekday) {
+    const names = ['', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
+    return names[weekday];
+  }
+
+  String _formatDate(DateTime d) =>
+      '${_weekdayName(d.weekday)}, ${d.day}/${d.month}';
+
+  Color _tagColor(String status) {
+    switch (status) {
+      case 'confirmed': return const Color(0xFF81C784);
+      case 'pending': return const Color(0xFFFFD54F);
+      case 'cancelled': return const Color(0xFFE57373);
+      default: return const Color(0xFF81C784);
+    }
+  }
+
+  String _tagText(String status, DateTime date) {
+    if (status == 'confirmed') return 'Đã xác nhận';
+    if (status == 'pending') return 'Chưa xác nhận';
+    if (status == 'cancelled') return 'Đã hủy';
+    final daysLeft = date.difference(DateTime.now()).inDays;
+    if (daysLeft == 0) return 'Hôm nay';
+    if (daysLeft == 1) return 'Ngày mai';
+    return 'Sắp tới';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final apptProvider = context.watch<AppointmentProvider>();
+
+    // Tính số lịch khám trong tuần này
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final thisWeekCount = apptProvider.appointments
+        .where((a) => a.date.isAfter(weekStart) && a.date.isBefore(weekEnd.add(const Duration(days: 1))))
+        .length;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
@@ -21,7 +62,7 @@ class AppointmentScheduleScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 16),
-                    _buildTopCard(),
+                    _buildTopCard(thisWeekCount),
                     const SizedBox(height: 24),
                     Text(
                       'Sắp tới',
@@ -31,9 +72,33 @@ class AppointmentScheduleScreen extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Vuốt trái để xóa • Vuốt phải để sửa',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    _buildAppointmentList(),
-                    const SizedBox(height: 100), // FAB space
+                    if (apptProvider.isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (apptProvider.appointments.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Text(
+                            'Chưa có lịch khám nào.',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      _buildAppointmentList(apptProvider.appointments, context),
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),
@@ -78,17 +143,14 @@ class AppointmentScheduleScreen extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: const Color(0xFF7E57C2), width: 1.5),
             ),
-            child: const Icon(
-              Icons.person_outline,
-              color: Color(0xFF7E57C2),
-            ),
+            child: const Icon(Icons.person_outline, color: Color(0xFF7E57C2)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTopCard() {
+  Widget _buildTopCard(int thisWeekCount) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -101,14 +163,10 @@ class AppointmentScheduleScreen extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: const BoxDecoration(
-              color: Color(0xFF4DD0E1), // Cyan/Teal color
+              color: Color(0xFF4DD0E1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 28,
-            ),
+            child: const Icon(Icons.add, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -123,7 +181,7 @@ class AppointmentScheduleScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '2 lịch khám - 1 di chuyển',
+                  thisWeekCount > 0 ? '$thisWeekCount lịch khám' : 'Không có lịch khám',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -136,45 +194,89 @@ class AppointmentScheduleScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAppointmentList() {
+  Widget _buildAppointmentList(List<AppointmentModel> appointments, BuildContext context) {
     return Column(
-      children: [
-        _AppointmentItemCard(
-          dateText: 'Thứ 6, 15/11',
-          title: 'Tái khám tim mạch',
-          personName: 'Bác sĩ Nguyễn Văn Minh',
-          location: 'Bệnh viện Đa khoa Hà Đông, 01 Quang Trung',
-          tagText: 'Chưa xác nhận',
-          tagColor: const Color(0xFFFFD54F), // Amber
-        ),
-        const SizedBox(height: 16),
-        _AppointmentItemCard(
-          dateText: 'Chủ nhật, 17/11',
-          title: 'Đi chợ với bạn',
-          personName: 'Bà Lan - Hàng xóm',
-          location: 'Chợ Hà Đông, đường Lê Trọng Tấn',
-          tagText: 'Đã nhắc',
-          tagColor: const Color(0xFF81C784), // Light green
-        ),
-        const SizedBox(height: 16),
-        _AppointmentItemCard(
-          dateText: 'Thứ 3, 19/11',
-          title: 'Khám tổng quát',
-          personName: 'Bác sĩ Lê Thị Bích',
-          location: 'Phòng khám Đa khoa Quang Trung, Hà Đông',
-          tagText: 'Nhắc trước 2 ngày',
-          tagColor: const Color(0xFFE57373), // Red/Salmon
-        ),
-        const SizedBox(height: 16),
-        _AppointmentItemCard(
-          dateText: 'Thứ 5, 21/11',
-          title: 'Đo huyết áp định kỳ',
-          personName: 'Trạm y tế phường Văn Quán',
-          location: 'Trạm Y tế Văn Quán, Hà Đông',
-          tagText: 'Sắp tới',
-          tagColor: const Color(0xFF81C784), // Light green
-        ),
-      ],
+      children: appointments.map((appt) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Dismissible(
+            key: Key(appt.id),
+            // background = vuốt phải → sửa
+            background: Container(
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.only(left: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF42A5F5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.edit_outlined, color: Colors.white, size: 22),
+                  SizedBox(width: 6),
+                  Text('Sửa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            // secondaryBackground = vuốt trái → xóa
+            secondaryBackground: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text('Xóa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  SizedBox(width: 6),
+                  Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                ],
+              ),
+            ),
+            confirmDismiss: (direction) async {
+              if (direction == DismissDirection.startToEnd) {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => AddAppointmentScreen(existing: appt)),
+                );
+                return false;
+              } else {
+                return await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Xóa lịch khám'),
+                    content: Text('Xóa "${appt.title}"?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+                      TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xóa', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                ) ?? false;
+              }
+            },
+            onDismissed: (_) async {
+              try {
+                await AppointmentRepository().deleteAppointment(appt.id);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Lỗi xóa: $e')),
+                  );
+                }
+              }
+            },
+            child: _AppointmentItemCard(
+              dateText: _formatDate(appt.date),
+              title: appt.title,
+              personName: appt.doctorName,
+              location: appt.location,
+              tagText: _tagText(appt.status, appt.date),
+              tagColor: _tagColor(appt.status),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -196,21 +298,16 @@ class AppointmentScheduleScreen extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(30),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AddAppointmentScreen()),
-            );
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddAppointmentScreen()),
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.add_circle_outline,
-                  color: Color(0xFF7E57C2), // Purple tone
-                ),
+                const Icon(Icons.add_circle_outline, color: Color(0xFF7E57C2)),
                 const SizedBox(width: 8),
                 Text(
                   'Thêm lịch',
@@ -266,78 +363,69 @@ class _AppointmentItemCard extends StatelessWidget {
                   color: AppColors.info.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.calendar_today_outlined,
-                  color: AppColors.info,
-                  size: 20,
-                ),
+                child: const Icon(Icons.calendar_today_outlined,
+                    color: AppColors.info, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      dateText,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
+                    Text(dateText,
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.textSecondary)),
                     const SizedBox(height: 2),
-                    Text(
-                      title,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(title,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.person_outline, size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  personName,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+          if (personName.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.person_outline,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(personName,
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textSecondary)),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  location,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              ],
+            ),
+          ],
+          if (location.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.location_on_outlined,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(location,
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textSecondary)),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: tagColor.withValues(alpha: 0.2), // Lighten background opacity
+              color: tagColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               tagText,
               style: AppTextStyles.bodySmall.copyWith(
-                color: tagColor, // Full opacity text
+                color: tagColor,
                 fontWeight: FontWeight.w600,
                 fontSize: 10,
               ),

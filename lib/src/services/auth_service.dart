@@ -12,6 +12,18 @@ class AuthService {
   // Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // Sign in anonymously for Parent role without credentials
+  Future<UserCredential?> signInAnonymously() async {
+    try {
+      final credential = await _auth.signInAnonymously();
+      debugPrint('User signed in anonymously: ${credential.user?.uid}');
+      return credential;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Anonymous sign in error: ${e.code} - ${e.message}');
+      rethrow;
+    }
+  }
+
   // Sign up with email and password
   Future<UserCredential?> signUpWithEmail({
     required String email,

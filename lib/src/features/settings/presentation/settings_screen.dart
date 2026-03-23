@@ -4,6 +4,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../auth/presentation/role_selection_screen.dart';
+import '../../../repositories/user_repository.dart';
 
 /// Settings screen
 class SettingsScreen extends StatelessWidget {
@@ -18,15 +19,10 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.backgroundLight,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           'Cài đặt',
-          style: AppTextStyles.heading3.copyWith(
-            color: AppColors.textPrimary,
-          ),
+          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary),
         ),
       ),
       body: SingleChildScrollView(
@@ -98,9 +94,11 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   _buildDivider(),
                   _SettingItem(
-                    icon: Icons.people_outline,
-                    title: 'Liên kết gia đình',
-                    onTap: () {},
+                    icon: Icons.phone_android,
+                    title: 'Cập nhật số điện thoại',
+                    onTap: () {
+                      _showUpdatePhoneDialog(context, authProvider);
+                    },
                   ),
                   _buildDivider(),
                   _SettingItem(
@@ -219,10 +217,93 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
           ],
         ),
       ),
+    );
+  }
+
+  void _showUpdatePhoneDialog(BuildContext context, AuthProvider authProvider) {
+    final TextEditingController phoneController = TextEditingController(text: authProvider.userModel?.phone ?? '');
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppColors.backgroundWhite,
+              title: Text(
+                'Cập nhật Số điện thoại',
+                style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Nhập số điện thoại của bạn để thiết bị Bố/Mẹ có thể tìm và liên kết:',
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneController,
+                    decoration: InputDecoration(
+                      hintText: '09xxxxxxxxx',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: CircularProgressIndicator(),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final phone = phoneController.text.trim();
+                          if (phone.isEmpty) return;
+
+                          setState(() => isLoading = true);
+                          try {
+                            final userRepo = UserRepository();
+                            await userRepo.updatePhone(authProvider.user!.uid, phone);
+                            await authProvider.reloadUserModel();
+
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Cập nhật số điện thoại thành công!')),
+                              );
+                            }
+                          } catch (e) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(content: Text('Lỗi: $e')),
+                              );
+                            }
+                          } finally {
+                            if (ctx.mounted) setState(() => isLoading = false);
+                          }
+                        },
+                  child: const Text('Lưu lại', style: TextStyle(color: AppColors.textWhite)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

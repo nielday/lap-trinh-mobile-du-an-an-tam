@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../models/user_model.dart';
+import '../repositories/user_repository.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 
@@ -7,22 +10,132 @@ import '../services/firestore_service.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
+  final UserRepository _userRepository = UserRepository();
 
   User? _user;
+  UserModel? _userModel;
   bool _isLoading = false;
   String? _errorMessage;
+  StreamSubscription<UserModel>? _userSub;
 
   User? get user => _user;
+  UserModel? get userModel => _userModel;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _user != null;
+  String? get parentId => _userModel?.parentId;
+
+  /// parentId hiệu quả để dùng cho medications/appointments/health_metrics:
+  /// - Nếu role = 'parent' → dùng uid của chính họ
+  /// - Nếu role = 'child' và có parentId → dùng parentId liên kết
+  /// - Fallback: dùng uid (để test CRUD không cần liên kết)
+  String? get effectiveParentId {
+    final uid = _user?.uid;
+    if (uid == null) return null;
+    
+    // Wait until Firestore user profile is completely loaded
+    // This prevents permission-denied race conditions
+    if (_userModel == null) return null;
+
+    // Tái cấu trúc theo yêu cầu của hệ thống: CON CÁI là trung tâm dữ liệu chủ. BỐ MẸ là người liên kết!
+    if (_userModel!.role == 'child') return uid;
+    
+    if (_userModel!.role == 'parent') {
+      if (_userModel!.parentId != null && _userModel!.parentId!.isNotEmpty) {
+        return _userModel!.parentId;
+      }
+    }
+    // Fallback: dùng uid của chính user (test mode / chưa liên kết)
+    return uid;
+  }
 
   AuthProvider() {
-    // Listen to auth state changes
     _authService.authStateChanges.listen((User? user) {
       _user = user;
-      notifyListeners();
+      _userSub?.cancel();
+      _userSub = null;
+      if (user != null) {
+        _userSub = _userRepository.streamUser(user.uid).listen((model) {
+          _userModel = model;
+          notifyListeners();
+        }, onError: (e) {
+          debugPrint('Stream user model error: $e');
+        });
+      } else {
+        _userModel = null;
+        notifyListeners();
+      }
     });
+  }
+
+  // (Bỏ _loadUserModel và thay thế bằng stream trực tiếp ở constructor)
+
+  // Hàm này giờ không cần làm gì vì _userModel tự cập nhật theo stream!
+  Future<void> reloadUserModel() async {
+    // Không cần body vì _userSub tự lo!
+  }
+
+  // Sign in anonymously (For Parents)
+  Future<bool> signInAsParentAnonymously() async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final String dummyEmail = 'parent_test_123@antam.com';
+      final String dummyPassword = 'antamParent123!';
+
+      UserCredential? credential;
+      bool isNewUser = false;
+
+      try {
+        credential = await _authService.signUpWithEmail(
+          email: dummyEmail,
+          password: dummyPassword,
+        );
+        isNewUser = true;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          // Parent already exists from a previous testing session, just log them back in!
+          credential = await _authService.signInWithEmail(
+            email: dummyEmail,
+            password: dummyPassword,
+          );
+        } else {
+          rethrow;
+        }
+      }
+      
+      if (credential != null && credential.user != null) {
+        if (isNewUser) {
+          await _firestoreService.createUserProfile(
+            userId: credential.user!.uid,
+            name: 'Phụ huynh',
+            email: dummyEmail,
+            role: 'parent',
+          );
+        }
+
+        _user = credential.user;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _authService.getErrorMessage(e.code);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   // Sign up with email
@@ -43,7 +156,6 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (credential != null && credential.user != null) {
-        // Create user profile in Firestore
         await _firestoreService.createUserProfile(
           userId: credential.user!.uid,
           name: name,
@@ -157,6 +269,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.signOut();
       _user = null;
+      _userModel = null;
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Đăng xuất thất bại';
@@ -189,7 +302,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Clear error message
   void clearError() {
     _errorMessage = null;
     notifyListeners();

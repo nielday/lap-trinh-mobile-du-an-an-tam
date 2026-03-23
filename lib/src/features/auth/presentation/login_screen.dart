@@ -6,6 +6,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../home/presentation/child_home_screen.dart';
+import '../../home/presentation/parent_home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
@@ -48,7 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
       // Navigate to home screen
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (context) => const ChildHomeScreen(),
+          builder: (context) => authProvider.userModel?.role == 'parent' 
+                                ? const ParentHomeScreen() 
+                                : const ChildHomeScreen(),
         ),
         (route) => false,
       );
@@ -86,7 +89,11 @@ class _LoginScreenState extends State<LoginScreen> {
     
     if (success) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const ChildHomeScreen()),
+        MaterialPageRoute(
+          builder: (context) => authProvider.userModel?.role == 'parent' 
+                                ? const ParentHomeScreen() 
+                                : const ChildHomeScreen()
+        ),
         (route) => false,
       );
     } else if (authProvider.errorMessage != null) {

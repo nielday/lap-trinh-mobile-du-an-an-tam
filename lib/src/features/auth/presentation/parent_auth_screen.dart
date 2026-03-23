@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../common_widgets/mascot_avatar.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../home/presentation/parent_home_screen.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
-import '../../home/presentation/parent_home_screen.dart';
-import '../../home/presentation/parent_medication_reminder_screen.dart';
-import '../../home/presentation/parent_settings_screen.dart';
+import 'login_screen.dart';
+
+import '../../../repositories/user_repository.dart';
 
 /// Parent auth screen - Simple authentication for elderly users
 /// Ultra simple interface with minimal steps
@@ -71,13 +74,22 @@ class ParentAuthScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
                 elevation: 4,
                 child: InkWell(
-                  onTap: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ParentHomeScreen(),
-                      ),
-                    );
+                  onTap: () async {
+                    final authProvider = context.read<AuthProvider>();
+                    final success = await authProvider.signInAsParentAnonymously();
+                    if (context.mounted && success) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ParentHomeScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    } else if (context.mounted && !success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(authProvider.errorMessage ?? 'Đăng nhập thất bại')),
+                      );
+                    }
                   },
                   borderRadius: BorderRadius.circular(24),
                   child: Container(
@@ -107,43 +119,6 @@ class ParentAuthScreen extends StatelessWidget {
               ),
               
               const SizedBox(height: 24),
-              
-              // Demo buttons for testing (simplified)
-              Column(
-                children: [
-                  _DemoButton(
-                    label: 'Nhắc uống thuốc',
-                    icon: Icons.alarm,
-                    color: AppColors.accentOrange,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ParentMedicationReminderScreen(
-                            medicationName: 'Thuốc Huyết Áp',
-                            dosage: '1 viên',
-                            scheduledTime: '8:00 sáng',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _DemoButton(
-                    label: 'Cài đặt',
-                    icon: Icons.settings,
-                    color: AppColors.secondaryNavy,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ParentSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
               
               const Spacer(flex: 2),
             ],

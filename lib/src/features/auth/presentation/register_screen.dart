@@ -6,11 +6,13 @@ import '../../../providers/auth_provider.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../home/presentation/child_home_screen.dart';
+import '../../home/presentation/parent_home_screen.dart';
 
 /// Register screen for Child (Người thân) role
 /// "Chào Bạn" - Create new account screen
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final String role;
+  const RegisterScreen({super.key, this.role = 'child'});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -56,7 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      role: 'child', // Default role for this screen
+      role: widget.role,
     );
 
     if (!mounted) return;
@@ -65,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Navigate to home screen
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (context) => const ChildHomeScreen(),
+          builder: (context) => widget.role == 'parent' ? const ParentHomeScreen() : const ChildHomeScreen(),
         ),
         (route) => false,
       );
