@@ -4,6 +4,9 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../home/presentation/parent_home_screen.dart';
 import '../../home/presentation/parent_medication_reminder_screen.dart';
+import '../../home/presentation/parent_sos_screen.dart';
+import '../../home/presentation/parent_incoming_call_screen.dart';
+import '../../home/presentation/parent_settings_screen.dart';
 
 /// Parent auth screen - Simple authentication for elderly users
 /// Ultra simple interface with minimal steps
@@ -107,47 +110,122 @@ class ParentAuthScreen extends StatelessWidget {
               
               const SizedBox(height: 24),
               
-              // Demo button for testing medication reminder
-              OutlinedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ParentMedicationReminderScreen(
-                        medicationName: 'Thuốc Huyết Áp',
-                        dosage: '1 viên',
-                        scheduledTime: '8:00 sáng',
-                      ),
-                    ),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                  side: const BorderSide(color: AppColors.accentOrange, width: 2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+              // Demo buttons for testing
+              Column(
+                children: [
+                  _DemoButton(
+                    label: 'Nhắc uống thuốc',
+                    icon: Icons.alarm,
+                    color: AppColors.accentOrange,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ParentMedicationReminderScreen(
+                            medicationName: 'Thuốc Huyết Áp',
+                            dosage: '1 viên',
+                            scheduledTime: '8:00 sáng',
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.alarm, color: AppColors.accentOrange),
-                    const SizedBox(width: 8),
-                    Text(
-                      'XEM NHẮC UỐNG THUỐC (Demo)',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.accentOrange,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                  const SizedBox(height: 12),
+                  _DemoButton(
+                    label: 'Màn hình SOS',
+                    icon: Icons.emergency,
+                    color: AppColors.error,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ParentSOSScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _DemoButton(
+                    label: 'Cuộc gọi đến',
+                    icon: Icons.phone_callback,
+                    color: AppColors.success,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ParentIncomingCallScreen(
+                            callerName: 'Bố',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _DemoButton(
+                    label: 'Cài đặt',
+                    icon: Icons.settings,
+                    color: AppColors.secondaryNavy,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ParentSettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
               
               const Spacer(flex: 2),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+/// Demo button widget for testing screens
+class _DemoButton extends StatelessWidget {
+  const _DemoButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+        side: BorderSide(color: color, width: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
+        ],
       ),
     );
   }
