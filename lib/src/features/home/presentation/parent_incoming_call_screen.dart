@@ -31,13 +31,20 @@ class ParentIncomingCallScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.primaryGreen, width: 4),
-                  image: DecorationImage(
-                    image: NetworkImage(
-                      callerAvatar ?? 'https://via.placeholder.com/140',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
+                  color: AppColors.backgroundWhite,
                 ),
+                child: callerAvatar != null
+                    ? ClipOval(
+                        child: Image.network(
+                          callerAvatar!,
+                          fit: BoxFit.cover,
+                          width: 140,
+                          height: 140,
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(Icons.person, size: 80, color: AppColors.textSecondary),
+                      ),
               ),
               
               const SizedBox(height: 32),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
@@ -5,6 +6,20 @@ import 'parent_medication_reminder_screen.dart';
 import 'parent_task_list_screen.dart';
 import 'parent_settings_screen.dart';
 import 'parent_calling_screen.dart';
+import 'family_album_screen.dart';
+import 'photo_upload_screen.dart';
+import 'photo_detail_screen.dart';
+import '../../chat/presentation/chat_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../providers/medication_provider.dart';
+import '../../../providers/health_metric_provider.dart';
+import '../../../providers/appointment_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/family_photo_provider.dart';
+import '../../../repositories/user_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Parent home screen - Ultra simple interface for elderly users
 /// Based on design mockup with weather, health stats, tasks, and family photos
@@ -18,14 +33,7 @@ class ParentHomeScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.backgroundLight,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textPrimary,
-            size: 28,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(
@@ -56,7 +64,7 @@ class ParentHomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
               
               // Health stats cards
-              _buildHealthStats(),
+              _buildHealthStats(context),
               
               const SizedBox(height: 20),
               
@@ -64,11 +72,7 @@ class ParentHomeScreen extends StatelessWidget {
               _buildActionButtons(context),
               
               const SizedBox(height: 20),
-              
-              // Completed button
-              _buildCompletedButton(context),
-              
-              const SizedBox(height: 24),
+              // Completed button đã bị loại bỏ theo yêu cầu báo cáo đơn lẻ
               
               // Tasks section
               _buildTasksSection(context),
@@ -76,7 +80,7 @@ class ParentHomeScreen extends StatelessWidget {
               const SizedBox(height: 24),
               
               // Family album section
-              _buildFamilyAlbumSection(),
+              _buildFamilyAlbumSection(context),
             ],
           ),
         ),
@@ -114,7 +118,7 @@ class ParentHomeScreen extends StatelessWidget {
           ),
           // Date
           Text(
-            'Thứ Sáu, 13/6',
+            DateFormat('EEEE, d/M', 'vi_VN').format(DateTime.now()),
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -124,36 +128,242 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthStats() {
-    return Row(
+  Widget _buildHealthStats(BuildContext context) {
+    final metricProvider = context.watch<HealthMetricProvider>();
+    final metric = metricProvider.latestMetric;
+
+    return Column(
       children: [
-        Expanded(
-          child: _HealthStatCard(
-            icon: Icons.favorite,
-            iconColor: AppColors.error,
-            value: '72 bpm',
-            label: 'Nhịp tim',
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.favorite,
+                iconColor: AppColors.error,
+                value: metric?.heartRate != null ? '${metric!.heartRate} bpm' : 'N/A',
+                label: 'Nhịp tim',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.show_chart,
+                iconColor: AppColors.accentOrange,
+                value: metric?.bloodPressure ?? 'N/A',
+                label: 'Huyết áp',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.monitor_weight_outlined,
+                iconColor: AppColors.textSecondary,
+                value: metric?.weight != null ? '${metric!.weight} kg' : 'N/A',
+                label: 'Cân nặng',
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _HealthStatCard(
-            icon: Icons.show_chart,
-            iconColor: AppColors.accentOrange,
-            value: '120/80',
-            label: 'Huyết áp',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _HealthStatCard(
-            icon: Icons.close,
-            iconColor: AppColors.textSecondary,
-            value: 'N/A',
-            label: 'Đường',
+        const SizedBox(height: 12),
+        // Nút nhập thông tin sức khỏe
+        Material(
+          color: const Color(0xFFFFB6C1), // Màu hồng nhạt (Light Pink)
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: () {
+              _showHealthInputDialog(context);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_circle_outline, color: AppColors.textWhite, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    'NHẬP THÔNG TIN SỨC KHỎE',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textWhite,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  void _showHealthInputDialog(BuildContext context) {
+    final heartRateController = TextEditingController();
+    final systolicController = TextEditingController();
+    final diastolicController = TextEditingController();
+    final weightController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Nhập thông tin sức khỏe',
+          style: AppTextStyles.heading3.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 22,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Nhịp tim
+              TextField(
+                controller: heartRateController,
+                keyboardType: TextInputType.number,
+                style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                decoration: InputDecoration(
+                  labelText: 'Nhịp tim (bpm)',
+                  labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                  hintText: 'Ví dụ: 72',
+                  prefixIcon: const Icon(Icons.favorite, color: AppColors.error),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Huyết áp
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: systolicController,
+                      keyboardType: TextInputType.number,
+                      style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                      decoration: InputDecoration(
+                        labelText: 'Tâm thu',
+                        labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                        hintText: '120',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('/', style: AppTextStyles.heading2),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: diastolicController,
+                      keyboardType: TextInputType.number,
+                      style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                      decoration: InputDecoration(
+                        labelText: 'Tâm trương',
+                        labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                        hintText: '80',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Cân nặng
+              TextField(
+                controller: weightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                decoration: InputDecoration(
+                  labelText: 'Cân nặng (kg)',
+                  labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                  hintText: 'Ví dụ: 65.5',
+                  prefixIcon: const Icon(Icons.monitor_weight_outlined, color: AppColors.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'HỦY',
+              style: AppTextStyles.buttonMedium.copyWith(
+                color: AppColors.textLight,
+                fontSize: 18,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = context.read<AuthProvider>();
+              final parentId = auth.effectiveParentId;
+
+              if (parentId == null) {
+                Navigator.pop(context);
+                return;
+              }
+
+              final heartRate = int.tryParse(heartRateController.text);
+              final systolic = int.tryParse(systolicController.text);
+              final diastolic = int.tryParse(diastolicController.text);
+              final weight = double.tryParse(weightController.text);
+
+              final bloodPressure = (systolic != null && diastolic != null)
+                  ? '$systolic/$diastolic'
+                  : null;
+
+              try {
+                await FirebaseFirestore.instance.collection('health_metrics').add({
+                  'parentId': parentId,
+                  'heartRate': heartRate,
+                  'bloodPressure': bloodPressure,
+                  'weight': weight,
+                  'recordedAt': FieldValue.serverTimestamp(),
+                });
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã lưu thông tin sức khỏe!'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Lỗi: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'LƯU',
+              style: AppTextStyles.buttonMedium.copyWith(
+                color: AppColors.textWhite,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -179,7 +389,7 @@ class ParentHomeScreen extends StatelessWidget {
                 label: 'Nhắn tin',
                 backgroundColor: AppColors.secondaryNavy,
                 onTap: () {
-                  // TODO: Implement message functionality
+                  _showMessageDialog(context);
                 },
               ),
             ),
@@ -297,6 +507,33 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
+  void _showMessageDialog(BuildContext context) async {
+    // Lấy childId từ parentId field trong user document của parent
+    final authProvider = context.read<AuthProvider>();
+    final childId = authProvider.effectiveParentId; // Đây chính là childId
+    
+    if (childId == null || childId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa liên kết với con cái'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Navigate đến ChatScreen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          otherUserId: childId,
+          otherUserName: 'Con',
+        ),
+      ),
+    );
+  }
+
   void _showSOSConfirmation(BuildContext context) {
     showDialog(
       context: context,
@@ -405,32 +642,94 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompletedButton(BuildContext context) {
-    return Material(
-      color: AppColors.primaryGreen,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {
-          _showCheckInConfirmation(context);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Text(
-            'Đã hoàn thành',
-            style: AppTextStyles.buttonMedium.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    );
-  }
+  // (Đã xóa _buildCompletedButton theo yêu cầu sử dụng checkbox cụ thể)
 
   Widget _buildTasksSection(BuildContext context) {
+    final medProvider = context.watch<MedicationProvider>();
+    final apptProvider = context.watch<AppointmentProvider>();
+    
+    final tasks = <Widget>[];
+
+    // Lấy thuốc hôm nay (chỉ hiển thị chưa hoàn thành)
+    if (medProvider.medications.isNotEmpty) {
+      for (final med in medProvider.medications.take(3)) {
+        final checkIn = medProvider.todayCheckIns.where((c) => c.medicationId == med.id).firstOrNull;
+        final isCompleted = checkIn?.status == 'completed';
+        
+        // Bỏ qua nếu đã hoàn thành
+        if (isCompleted) continue;
+        
+        IconData icon = Icons.medication;
+        Color color = const Color(0xFF7E57C2); // Tím
+        if (med.type == 'Bữa ăn') {
+          icon = Icons.restaurant;
+          color = const Color(0xFF66BB6A);
+        } else if (med.type == 'Hoạt động') {
+          icon = Icons.directions_walk;
+          color = const Color(0xFF42A5F5);
+        }
+
+        tasks.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _TaskItem(
+              icon: icon,
+              iconColor: color,
+              title: med.name,
+              subtitle: '${med.time} - Hôm nay',
+              isCompleted: false,
+              onTap: () {
+                _showCheckInConfirmation(context, med: med, medProvider: medProvider, authProvider: context.read<AuthProvider>());
+              },
+            ),
+          ),
+        );
+      }
+    }
+
+    // Lấy lịch khám sắp tới (chỉ hiển thị chưa hoàn thành)
+    if (apptProvider.appointments.isNotEmpty && tasks.length < 5) {
+      for (final appt in apptProvider.appointments.take(2)) {
+        final isCompleted = appt.status == 'completed';
+        
+        // Bỏ qua nếu đã hoàn thành
+        if (isCompleted) continue;
+        
+        final daysLeft = appt.date.difference(DateTime.now()).inDays;
+        final timeStr = daysLeft == 0 ? 'Hôm nay' : daysLeft == 1 ? 'Ngày mai' : 'Còn $daysLeft ngày';
+        
+        tasks.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _TaskItem(
+              icon: Icons.calendar_today,
+              iconColor: AppColors.accentOrange,
+              title: appt.title,
+              subtitle: timeStr,
+              isCompleted: false,
+              onTap: () {
+                _showAppointmentConfirmation(context, appt: appt);
+              },
+            ),
+          ),
+        );
+      }
+    }
+
+    if (tasks.isEmpty) {
+      tasks.add(
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Không có công việc nào sắp tới.',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         Row(
@@ -464,37 +763,15 @@ class ParentHomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        _TaskItem(
-          icon: Icons.medication,
-          iconColor: AppColors.success,
-          title: 'Thuốc Huyết áp',
-          subtitle: 'Đã hoàn thành',
-          isCompleted: true,
-          onTap: () {},
-        ),
-        const SizedBox(height: 8),
-        _TaskItem(
-          icon: Icons.visibility,
-          iconColor: AppColors.accentOrange,
-          title: 'Đi khám mắt',
-          subtitle: '14:00 - Hôm nay',
-          isCompleted: false,
-          onTap: () {},
-        ),
-        const SizedBox(height: 8),
-        _TaskItem(
-          icon: Icons.fitness_center,
-          iconColor: AppColors.secondaryNavy,
-          title: 'Tập thể dục',
-          subtitle: '07:00 - Ngày mai',
-          isCompleted: false,
-          onTap: () {},
-        ),
+        ...tasks,
       ],
     );
   }
 
-  Widget _buildFamilyAlbumSection() {
+  Widget _buildFamilyAlbumSection(BuildContext context) {
+    final photoProvider = context.watch<FamilyPhotoProvider>();
+    final photos = photoProvider.photos.take(2).toList();
+
     return Column(
       children: [
         Row(
@@ -510,7 +787,12 @@ class ParentHomeScreen extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                // TODO: Navigate to full album
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FamilyAlbumScreen(),
+                  ),
+                );
               },
               child: Text(
                 'Xem tất cả',
@@ -523,96 +805,222 @@ class ParentHomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _FamilyPhotoCard(
-                imageUrl: 'https://via.placeholder.com/150',
-                caption: 'Ảnh ông bà',
+        if (photoProvider.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (photos.isEmpty)
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhotoUploadScreen(),
+                ),
+              );
+            },
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.backgroundWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.indicatorInactive,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_photo_alternate, color: AppColors.textSecondary, size: 36),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Thêm ảnh đầu tiên',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _FamilyPhotoCard(
-                imageUrl: 'https://via.placeholder.com/150',
-                caption: 'Ảnh gia đình sum họp',
-              ),
-            ),
-          ],
-        ),
+          )
+        else
+          Row(
+            children: [
+              if (photos.isNotEmpty)
+                Expanded(
+                  child: _FamilyPhotoCard(
+                    photo: photos[0],
+                  ),
+                ),
+              if (photos.length > 1) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _FamilyPhotoCard(
+                    photo: photos[1],
+                  ),
+                ),
+              ],
+            ],
+          ),
       ],
     );
   }
 
-  void _showCheckInConfirmation(BuildContext context) {
-    showDialog(
+  void _showCheckInConfirmation(BuildContext context, {dynamic med, required MedicationProvider medProvider, required AuthProvider authProvider}) async {
+    final parentId = authProvider.effectiveParentId;
+    if (parentId == null || med == null) return;
+
+    if (!context.mounted) return;
+
+    // HIỂN THỊ HỘP THOẠI HỎI XÁC NHẬN TRƯỚC!
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.backgroundWhite,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Xác nhận uống thuốc',
+          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary, fontSize: 22),
+          textAlign: TextAlign.center,
         ),
-        contentPadding: const EdgeInsets.all(32),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.success,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check,
-                color: AppColors.textWhite,
-                size: 48,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'ĐÃ GHI NHẬN!',
-              style: AppTextStyles.heading3.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 24,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Công việc đã được hoàn thành',
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            Material(
-              color: AppColors.success,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                onTap: () => Navigator.pop(context),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'ĐÓNG',
-                    style: AppTextStyles.buttonLarge.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        content: Text(
+          'Bố/Mẹ ĐÃ uống thuốc "${med.name}" rồi phải không ạ?',
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary, fontSize: 18),
+          textAlign: TextAlign.center,
         ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // HỦY
+            child: Text(
+              'CHƯA UỐNG',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textLight, fontSize: 18),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true), // ĐÃ UỐNG
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'ĐÃ UỐNG',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textWhite, fontSize: 18),
+            ),
+          ),
+        ],
       ),
     );
+
+    // KHI ẤN ĐÃ UỐNG THÌ MỚI GHI LÊN FIREBASE
+    if (confirm == true) {
+      try {
+        await FirebaseFirestore.instance.collection('checkIns').add({
+          'medicationId': med.id,
+          'parentId': parentId,
+          'status': 'completed',
+          'timestamp': Timestamp.now(), // Sử dụng thời gian thực để bên máy con cập nhật ngay lập tức
+        });
+
+        if (context.mounted) {
+          // Hiển thị thông báo thành công nhanh bằng Snackbar (ko cần che cả màn hình làm mất thời gian)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tuyệt vời! Đã Ghi nhận hoàn thành thành công.'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('check in error: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khi ghi nhận: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
+
+    // (Phần dialog thành công cũ che màn hình đã bị loại bỏ vì giờ xài Snackbar)
+  }
+
+  void _showAppointmentConfirmation(BuildContext context, {required dynamic appt}) async {
+    if (!context.mounted) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Xác nhận khám bệnh',
+          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary, fontSize: 22),
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'Bố/Mẹ ĐÃ đi khám "${appt.title}" rồi phải không ạ?',
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary, fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // HỦY
+            child: Text(
+              'CHƯA ĐI',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textLight, fontSize: 18),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true), // ĐÃ ĐI
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'ĐÃ KHÁM',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textWhite, fontSize: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await FirebaseFirestore.instance.collection('appointments').doc(appt.id).update({
+          'status': 'completed',
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tuyệt vời! Đã ghi nhận đi khám thành công.'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('appt check in error: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khi cập nhật: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
   }
 }
 
@@ -837,6 +1245,25 @@ class _TaskItem extends StatelessWidget {
                   ],
                 ),
               ),
+              if (!isCompleted)
+                IconButton(
+                  onPressed: onTap,
+                  icon: const Icon(
+                    Icons.radio_button_unchecked,
+                    color: AppColors.primaryGreen,
+                    size: 32,
+                  ),
+                  tooltip: 'Đánh dấu hoàn thành',
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.only(right: 8.0),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: AppColors.success,
+                    size: 32,
+                  ),
+                ),
             ],
           ),
         ),
@@ -848,40 +1275,74 @@ class _TaskItem extends StatelessWidget {
 /// Family photo card widget
 class _FamilyPhotoCard extends StatelessWidget {
   const _FamilyPhotoCard({
-    required this.imageUrl,
-    required this.caption,
+    required this.photo,
   });
 
-  final String imageUrl;
-  final String caption;
+  final dynamic photo;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            color: AppColors.backgroundWhite,
-            borderRadius: BorderRadius.circular(12),
-            image: DecorationImage(
-              image: NetworkImage(imageUrl),
-              fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotoDetailScreen(photo: photo),
+          ),
+        );
+      },
+      child: Column(
+        children: [
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: AppColors.backgroundWhite,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: kIsWeb
+                  ? Image.network(
+                      photo.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stackTrace) => const Center(
+                        child: Icon(Icons.broken_image, color: AppColors.textSecondary, size: 48),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: photo.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(Icons.broken_image, color: AppColors.textSecondary, size: 48),
+                      ),
+                    ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          caption,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.textSecondary,
-            fontSize: 12,
+          const SizedBox(height: 8),
+          Text(
+            photo.caption,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

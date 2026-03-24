@@ -19,7 +19,7 @@ class ChildAuthScreen extends StatefulWidget {
 }
 
 class _ChildAuthScreenState extends State<ChildAuthScreen> {
-  int _currentPage = 0;
+  final int _currentPage = 0;
   late final TapGestureRecognizer _termsRecognizer;
 
   @override

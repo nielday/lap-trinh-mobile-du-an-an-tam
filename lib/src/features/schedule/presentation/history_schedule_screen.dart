@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../models/medication_model.dart';
+import '../../../providers/medication_provider.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 
+/// Màn hình lịch sử uống thuốc - dùng real data từ MedicationProvider
 class HistoryScheduleScreen extends StatelessWidget {
   const HistoryScheduleScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final medProvider = context.watch<MedicationProvider>();
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
@@ -14,16 +20,19 @@ class HistoryScheduleScreen extends StatelessWidget {
           children: [
             _buildHeader(context),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  children: [
-                    _buildSummaryCard(),
-                    const SizedBox(height: 24),
-                    _buildHistoryList(),
-                  ],
-                ),
-              ),
+              child: medProvider.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
+                      child: Column(
+                        children: [
+                          _buildSummaryCard(medProvider.complianceRate),
+                          const SizedBox(height: 24),
+                          _buildHistoryList(medProvider),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -62,17 +71,15 @@ class HistoryScheduleScreen extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: const Color(0xFF7E57C2), width: 1.5),
             ),
-            child: const Icon(
-              Icons.person_outline,
-              color: Color(0xFF7E57C2),
-            ),
+            child: const Icon(Icons.person_outline, color: Color(0xFF7E57C2)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildSummaryCard(double rate) {
+    final rateText = rate > 0 ? '${rate.toStringAsFixed(0)}%' : '--';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -81,11 +88,7 @@ class HistoryScheduleScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.trending_up, 
-            color: Color(0xFF00B21E), // Bright green
-            size: 36,
-          ),
+          const Icon(Icons.trending_up, color: Color(0xFF00B21E), size: 36),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,9 +101,9 @@ class HistoryScheduleScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                '92%',
+                rateText,
                 style: AppTextStyles.heading1.copyWith(
-                  color: const Color(0xFF00B21E), // Bright green
+                  color: const Color(0xFF00B21E),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -111,21 +114,84 @@ class HistoryScheduleScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHistoryList() {
+  Widget _buildHistoryList(MedicationProvider medProvider) {
+    // monthCheckIns chứa toàn bộ lịch sử trong tháng
+    final checkIns = medProvider.monthCheckIns;
+    final meds = medProvider.medications;
+
+    if (checkIns.isEmpty) {
+      return Text(
+        'Chưa có lịch sử nào trong tháng này.',
+        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+      );
+    }
+
     return Column(
-      children: List.generate(
-        6,
-        (index) => const Padding(
-          padding: EdgeInsets.only(bottom: 12),
-          child: _HistoryItemCard(),
-        ),
-      ),
+      children: checkIns.map((checkIn) {
+        MedicationModel? med;
+        try { med = meds.firstWhere((m) => m.id == checkIn.medicationId); } catch (_) {}
+        final medName = med?.name ?? 'Không rõ';
+        final medType = med?.type ?? 'Thuốc';
+        final taken = checkIn.status == 'completed';
+        final timeStr = checkIn.timestamp != null
+            ? '${checkIn.timestamp!.hour.toString().padLeft(2, '0')}:${checkIn.timestamp!.minute.toString().padLeft(2, '0')}'
+            : '';
+
+        // Label tuỳ theo loại
+        final String doneLabel;
+        final String notDoneLabel;
+        switch (medType) {
+          case 'Bữa ăn':
+            doneLabel = 'Đã ăn';
+            notDoneLabel = 'Chưa ăn';
+            break;
+          case 'Hoạt động':
+            doneLabel = 'Đã làm';
+            notDoneLabel = 'Chưa làm';
+            break;
+          default:
+            doneLabel = 'Đã uống';
+            notDoneLabel = 'Chưa uống';
+        }
+
+        final subtitle = taken && timeStr.isNotEmpty
+            ? '$doneLabel lúc $timeStr'
+            : notDoneLabel;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _HistoryItemCard(
+            name: medName,
+            subtitle: subtitle,
+            taken: taken,
+            type: medType,
+          ),
+        );
+      }).toList(),
     );
   }
 }
 
 class _HistoryItemCard extends StatelessWidget {
-  const _HistoryItemCard();
+  const _HistoryItemCard({
+    required this.name,
+    required this.subtitle,
+    required this.taken,
+    this.type = 'Thuốc',
+  });
+
+  final String name;
+  final String subtitle;
+  final bool taken;
+  final String type;
+
+  IconData get _icon {
+    switch (type) {
+      case 'Bữa ăn':    return Icons.restaurant;
+      case 'Hoạt động': return Icons.directions_walk;
+      default:           return Icons.medication;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,14 +207,12 @@ class _HistoryItemCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFF6B9B40), // Darker green background for icon
+              color: taken
+                  ? const Color(0xFF6B9B40)
+                  : AppColors.error.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.medication, 
-              color: Colors.white,
-              size: 24,
-            ),
+            child: Icon(_icon, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -156,14 +220,14 @@ class _HistoryItemCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Thuốc huyết áp sáng',
+                  name,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  'Đã uống lúc 8:05',
+                  subtitle,
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -171,9 +235,9 @@ class _HistoryItemCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
-            Icons.check,
-            color: Color(0xFF00B21E), // Checkmark green
+          Icon(
+            taken ? Icons.check : Icons.close,
+            color: taken ? const Color(0xFF00B21E) : AppColors.error,
             size: 24,
           ),
         ],

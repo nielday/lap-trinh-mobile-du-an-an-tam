@@ -3,6 +3,9 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../settings/presentation/parent_account_settings_screen.dart';
 import '../../settings/presentation/parent_family_link_screen.dart';
+import '../../auth/presentation/role_selection_screen.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 
 /// Parent settings screen - Configuration and preferences
 class ParentSettingsScreen extends StatelessWidget {
@@ -45,11 +48,9 @@ class ParentSettingsScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.primaryGreen, width: 3),
-                    image: const DecorationImage(
-                      image: NetworkImage('https://via.placeholder.com/70'),
-                      fit: BoxFit.cover,
-                    ),
+                    color: AppColors.backgroundWhite,
                   ),
+                  child: const Icon(Icons.person, color: AppColors.textSecondary, size: 40),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -57,7 +58,7 @@ class ParentSettingsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Uiia',
+                        'Phụ huynh',
                         style: AppTextStyles.heading3.copyWith(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w700,
@@ -66,7 +67,7 @@ class ParentSettingsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Chỉnh sửa hồ sơ',
+                        'Chế độ theo dõi sức khỏe',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -80,21 +81,7 @@ class ParentSettingsScreen extends StatelessWidget {
           ),
           
           const SizedBox(height: 24),
-          
           // Settings options
-          _SettingItem(
-            icon: Icons.person,
-            title: 'Tài khoản và bảo mật',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ParentAccountSettingsScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
           _SettingItem(
             icon: Icons.people,
             title: 'Liên kết gia đình',
@@ -161,6 +148,25 @@ class ParentSettingsScreen extends StatelessWidget {
             title: 'Chính sách bảo mật',
             onTap: () {},
           ),
+          const SizedBox(height: 24),
+          _SettingItem(
+            icon: Icons.logout,
+            title: 'Đăng xuất',
+            textColor: AppColors.error,
+            iconColor: AppColors.error,
+            onTap: () async {
+              await context.read<AuthProvider>().signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RoleSelectionScreen(),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
+          ),
         ],
       ),
     );
@@ -173,11 +179,15 @@ class _SettingItem extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.textColor,
+    this.iconColor,
   });
 
   final IconData icon;
   final String title;
   final VoidCallback onTap;
+  final Color? textColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +203,7 @@ class _SettingItem extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: AppColors.textSecondary,
+                color: iconColor ?? AppColors.textSecondary,
                 size: 24,
               ),
               const SizedBox(width: 16),
@@ -201,12 +211,12 @@ class _SettingItem extends StatelessWidget {
                 child: Text(
                   title,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
+                    color: textColor ?? AppColors.textPrimary,
                     fontSize: 15,
                   ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
                 color: AppColors.textSecondary,
                 size: 24,

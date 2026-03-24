@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Medications collection
+    match /medications/{medicationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // CheckIns collection
+    match /checkIns/{checkInId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Alerts collection
+    match /alerts/{alertId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Reminders collection
+    match /reminders/{reminderId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Messages collection
+    match /messages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Appointments collection
+    match /appointments/{appointmentId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Health metrics collection
+    match /health_metrics/{metricId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Family Photos collection
+    match /family_photos/{photoId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Family links collection
+    match /familyLinks/{linkId} {
+      allow read: if isAuthenticated() && (
+        resource.data.childId == request.auth.uid ||
+        resource.data.parentId == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.childId == request.auth.uid ||
+        resource.data.parentId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.childId == request.auth.uid ||
+        resource.data.parentId == request.auth.uid
+      );
+    }
+  }
+}
