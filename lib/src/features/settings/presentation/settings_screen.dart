@@ -57,7 +57,9 @@ class SettingsScreen extends StatelessWidget {
 
                   // Name
                   Text(
-                    authProvider.user?.displayName ?? 'Uiia',
+                    authProvider.userModel?.name ?? 
+                    authProvider.user?.displayName ?? 
+                    'Người dùng',
                     style: AppTextStyles.heading2.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,

@@ -11,12 +11,16 @@ import '../../../providers/reminder_provider.dart';
 import '../../../providers/alert_provider.dart';
 import '../../../providers/appointment_provider.dart';
 import '../../../providers/family_photo_provider.dart';
+import '../../../providers/health_metric_provider.dart';
+import '../../../repositories/user_repository.dart';
+import '../../../services/alert_monitoring_service.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../schedule/presentation/schedule_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import 'family_album_screen.dart';
 import 'photo_upload_screen.dart';
 import 'photo_detail_screen.dart';
+import 'compliance_history_screen.dart';
 
 /// Child home screen - Main dashboard after login
 /// Uses a persistent bottom navbar with IndexedStack so tabs maintain their state.
@@ -57,8 +61,51 @@ class _ChildHomeScreenState extends State<ChildHomeScreen> {
 // Dashboard Tab (index 0) – full scrollable content
 // ---------------------------------------------------------------------------
 
-class _DashboardTab extends StatelessWidget {
+class _DashboardTab extends StatefulWidget {
   const _DashboardTab();
+
+  @override
+  State<_DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<_DashboardTab> {
+  final AlertMonitoringService _alertMonitoring = AlertMonitoringService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startMonitoring();
+    });
+  }
+
+  void _startMonitoring() async {
+    final auth = context.read<AuthProvider>();
+    final childId = auth.user?.uid;
+    
+    if (childId == null || childId.isEmpty) return;
+
+    // Tìm parent liên kết
+    try {
+      final userRepo = UserRepository();
+      final parent = await userRepo.getLinkedParentByChildId(childId);
+      
+      if (parent != null) {
+        _alertMonitoring.startMonitoring(
+          parentId: parent.id,
+          childId: childId,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error starting alert monitoring: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _alertMonitoring.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +123,8 @@ class _DashboardTab extends StatelessWidget {
                   children: [
                     const SizedBox(height: 16),
                     _buildActionButtons(context),
+                    const SizedBox(height: 20),
+                    _buildHealthStatsSection(context),
                     const SizedBox(height: 20),
                     _buildStatusSection(context),
                     const SizedBox(height: 24),
@@ -236,28 +285,106 @@ class _DashboardTab extends StatelessWidget {
             icon: Icons.message,
             label: 'Nhắn tin',
             backgroundColor: AppColors.secondaryNavy,
-            onTap: () {
+            onTap: () async {
               final auth = context.read<AuthProvider>();
-              final parentId = auth.effectiveParentId;
-              if (parentId == null || parentId.isEmpty) {
+              final childId = auth.user?.uid;
+              
+              if (childId == null || childId.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Chưa liên kết với gia đình'),
+                    content: Text('Chưa đăng nhập'),
                   ),
                 );
                 return;
               }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatScreen(
-                    otherUserId: parentId,
-                    otherUserName: 'Gia đình',
+
+              // Tìm parent có liên kết với child này
+              try {
+                final userRepo = UserRepository();
+                final parent = await userRepo.getLinkedParentByChildId(childId);
+                
+                if (!context.mounted) return;
+                
+                if (parent == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Chưa liên kết với gia đình'),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      otherUserId: parent.id,
+                      otherUserName: 'Gia đình',
+                    ),
                   ),
-                ),
-              );
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Lỗi: $e'),
+                    ),
+                  );
+                }
+              }
             },
           ),
+        ),
+      ],
+    );
+  }
+
+  // ── Health Stats section – Hiển thị thông tin sức khỏe của bố mẹ ──────────
+
+  Widget _buildHealthStatsSection(BuildContext context) {
+    final metricProvider = context.watch<HealthMetricProvider>();
+    final metric = metricProvider.latestMetric;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Thông tin sức khỏe',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.favorite,
+                iconColor: AppColors.error,
+                value: metric?.heartRate != null ? '${metric!.heartRate} bpm' : 'N/A',
+                label: 'Nhịp tim',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.show_chart,
+                iconColor: AppColors.accentOrange,
+                value: metric?.bloodPressure ?? 'N/A',
+                label: 'Huyết áp',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.monitor_weight_outlined,
+                iconColor: AppColors.textSecondary,
+                value: metric?.weight != null ? '${metric!.weight} kg' : 'N/A',
+                label: 'Cân nặng',
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -303,7 +430,7 @@ class _DashboardTab extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 12),
               child: _StatusCard(
                 icon: _iconForType(med.type ?? 'Thuốc'),
-                iconColor: isCompleted ? AppColors.success : _colorForType(med.type ?? 'Thuốc'),
+                iconColor: _colorForType(med.type ?? 'Thuốc'),
                 title: med.name,
                 subtitle: isCompleted ? 'Đã hoàn thành' : 'Chưa thực hiện',
                 time: timeLabel,
@@ -448,6 +575,8 @@ class _DashboardTab extends StatelessWidget {
         return Icons.sos;
       case 'missed_medication':
         return Icons.medication_liquid;
+      case 'missed_appointment':
+        return Icons.calendar_today;
       default:
         return Icons.warning;
     }
@@ -458,6 +587,8 @@ class _DashboardTab extends StatelessWidget {
       case 'sos':
         return AppColors.error;
       case 'missed_medication':
+        return AppColors.accentOrange;
+      case 'missed_appointment':
         return AppColors.accentOrange;
       default:
         return AppColors.info;
@@ -601,11 +732,21 @@ class _DashboardTab extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            Text(
-              'Xem tất cả',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.primaryGreen,
-                fontWeight: FontWeight.w500,
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ComplianceHistoryScreen(),
+                  ),
+                );
+              },
+              child: Text(
+                'Xem tất cả',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.primaryGreen,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -940,25 +1081,31 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompleted = status == 'completed';
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.backgroundWhite,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.indicatorInactive),
+        border: Border.all(
+          color: isCompleted 
+              ? AppColors.success.withValues(alpha: 0.3)
+              : AppColors.indicatorInactive,
+        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: iconColor,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: AppColors.textWhite, size: 20),
+            child: Icon(icon, color: AppColors.textWhite, size: 28),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -970,24 +1117,39 @@ class _StatusCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   subtitle,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
+                    color: isCompleted ? AppColors.success : AppColors.textSecondary,
+                    fontWeight: isCompleted ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   time,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textLight,
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-          if (status == 'completed')
-            const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+          if (isCompleted)
+            Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: AppColors.success,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check,
+                color: AppColors.textWhite,
+                size: 20,
+              ),
+            ),
         ],
       ),
     );
@@ -1166,16 +1328,28 @@ class _AppointmentCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.backgroundWhite,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.indicatorInactive.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: isCompleted 
+              ? AppColors.success.withValues(alpha: 0.3)
+              : AppColors.indicatorInactive.withValues(alpha: 0.5),
+        ),
       ),
       child: Row(
         children: [
-          Icon(
-            isCompleted ? Icons.check_circle : Icons.calendar_today_outlined,
-            color: isCompleted ? AppColors.success : AppColors.textSecondary,
-            size: 24,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.accentOrange,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.calendar_today,
+              color: AppColors.textWhite,
+              size: 28,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1183,7 +1357,8 @@ class _AppointmentCard extends StatelessWidget {
                 Text(
                   dateStr,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textLight,
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1194,48 +1369,44 @@ class _AppointmentCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (doctor.isNotEmpty)
+                if (doctor.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   Text(
                     doctor,
                     style: AppTextStyles.bodySmall.copyWith(
                       color: AppColors.textSecondary,
+                      fontSize: 12,
                     ),
                   ),
+                ],
               ],
             ),
           ),
           if (isCompleted)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: AppColors.success,
+                shape: BoxShape.circle,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: AppColors.success, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Đã khám',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              child: const Icon(
+                Icons.check,
+                color: AppColors.textWhite,
+                size: 20,
               ),
             )
           else
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.1),
+                color: AppColors.accentOrange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 tag,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.info,
+                  color: AppColors.accentOrange,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1445,6 +1616,59 @@ class _ChildPhotoCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HealthStatCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String label;
+
+  const _HealthStatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundWhite,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: iconColor,
+            size: 32,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

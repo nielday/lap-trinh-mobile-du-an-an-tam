@@ -123,4 +123,53 @@ class UserRepository {
       return FamilyLinkModel.fromFirestore(snap.docs.first);
     });
   }
+
+  Future<FamilyLinkModel?> getFamilyLink(String userId) async {
+    try {
+      // Thử tìm link với userId là parentId
+      var snap = await _familyLinks
+          .where('parentId', isEqualTo: userId)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
+          .get();
+      
+      if (snap.docs.isNotEmpty) {
+        return FamilyLinkModel.fromFirestore(snap.docs.first);
+      }
+
+      // Nếu không tìm thấy, thử tìm link với userId là childId
+      snap = await _familyLinks
+          .where('childId', isEqualTo: userId)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
+          .get();
+      
+      if (snap.docs.isNotEmpty) {
+        return FamilyLinkModel.fromFirestore(snap.docs.first);
+      }
+
+      return null;
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') throw const PermissionDeniedException();
+      throw Exception('Lỗi lấy liên kết gia đình: ${e.message}');
+    }
+  }
+
+  /// Tìm parent user có liên kết với childId này
+  /// (Parent có field parentId = childId)
+  Future<UserModel?> getLinkedParentByChildId(String childId) async {
+    try {
+      final snap = await _users
+          .where('role', isEqualTo: 'parent')
+          .where('parentId', isEqualTo: childId)
+          .limit(1)
+          .get();
+      
+      if (snap.docs.isEmpty) return null;
+      return UserModel.fromFirestore(snap.docs.first);
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') throw const PermissionDeniedException();
+      throw Exception('Lỗi tìm parent: ${e.message}');
+    }
+  }
 }

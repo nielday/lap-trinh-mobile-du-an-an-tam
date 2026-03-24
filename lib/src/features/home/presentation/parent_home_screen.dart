@@ -9,6 +9,7 @@ import 'parent_calling_screen.dart';
 import 'family_album_screen.dart';
 import 'photo_upload_screen.dart';
 import 'photo_detail_screen.dart';
+import '../../chat/presentation/chat_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -131,35 +132,238 @@ class ParentHomeScreen extends StatelessWidget {
     final metricProvider = context.watch<HealthMetricProvider>();
     final metric = metricProvider.latestMetric;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _HealthStatCard(
-            icon: Icons.favorite,
-            iconColor: AppColors.error,
-            value: metric?.heartRate != null ? '${metric!.heartRate} bpm' : 'N/A',
-            label: 'Nhịp tim',
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.favorite,
+                iconColor: AppColors.error,
+                value: metric?.heartRate != null ? '${metric!.heartRate} bpm' : 'N/A',
+                label: 'Nhịp tim',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.show_chart,
+                iconColor: AppColors.accentOrange,
+                value: metric?.bloodPressure ?? 'N/A',
+                label: 'Huyết áp',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HealthStatCard(
+                icon: Icons.monitor_weight_outlined,
+                iconColor: AppColors.textSecondary,
+                value: metric?.weight != null ? '${metric!.weight} kg' : 'N/A',
+                label: 'Cân nặng',
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _HealthStatCard(
-            icon: Icons.show_chart,
-            iconColor: AppColors.accentOrange,
-            value: metric?.bloodPressure ?? 'N/A',
-            label: 'Huyết áp',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _HealthStatCard(
-            icon: Icons.monitor_weight_outlined,
-            iconColor: AppColors.textSecondary,
-            value: metric?.weight != null ? '${metric!.weight} kg' : 'N/A',
-            label: 'Cân nặng',
+        const SizedBox(height: 12),
+        // Nút nhập thông tin sức khỏe
+        Material(
+          color: const Color(0xFFFFB6C1), // Màu hồng nhạt (Light Pink)
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: () {
+              _showHealthInputDialog(context);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_circle_outline, color: AppColors.textWhite, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    'NHẬP THÔNG TIN SỨC KHỎE',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textWhite,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  void _showHealthInputDialog(BuildContext context) {
+    final heartRateController = TextEditingController();
+    final systolicController = TextEditingController();
+    final diastolicController = TextEditingController();
+    final weightController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Nhập thông tin sức khỏe',
+          style: AppTextStyles.heading3.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 22,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Nhịp tim
+              TextField(
+                controller: heartRateController,
+                keyboardType: TextInputType.number,
+                style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                decoration: InputDecoration(
+                  labelText: 'Nhịp tim (bpm)',
+                  labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                  hintText: 'Ví dụ: 72',
+                  prefixIcon: const Icon(Icons.favorite, color: AppColors.error),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Huyết áp
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: systolicController,
+                      keyboardType: TextInputType.number,
+                      style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                      decoration: InputDecoration(
+                        labelText: 'Tâm thu',
+                        labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                        hintText: '120',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('/', style: AppTextStyles.heading2),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: diastolicController,
+                      keyboardType: TextInputType.number,
+                      style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                      decoration: InputDecoration(
+                        labelText: 'Tâm trương',
+                        labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                        hintText: '80',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Cân nặng
+              TextField(
+                controller: weightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: AppTextStyles.bodyLarge.copyWith(fontSize: 18),
+                decoration: InputDecoration(
+                  labelText: 'Cân nặng (kg)',
+                  labelStyle: AppTextStyles.bodyMedium.copyWith(fontSize: 16),
+                  hintText: 'Ví dụ: 65.5',
+                  prefixIcon: const Icon(Icons.monitor_weight_outlined, color: AppColors.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'HỦY',
+              style: AppTextStyles.buttonMedium.copyWith(
+                color: AppColors.textLight,
+                fontSize: 18,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = context.read<AuthProvider>();
+              final parentId = auth.effectiveParentId;
+
+              if (parentId == null) {
+                Navigator.pop(context);
+                return;
+              }
+
+              final heartRate = int.tryParse(heartRateController.text);
+              final systolic = int.tryParse(systolicController.text);
+              final diastolic = int.tryParse(diastolicController.text);
+              final weight = double.tryParse(weightController.text);
+
+              final bloodPressure = (systolic != null && diastolic != null)
+                  ? '$systolic/$diastolic'
+                  : null;
+
+              try {
+                await FirebaseFirestore.instance.collection('health_metrics').add({
+                  'parentId': parentId,
+                  'heartRate': heartRate,
+                  'bloodPressure': bloodPressure,
+                  'weight': weight,
+                  'recordedAt': FieldValue.serverTimestamp(),
+                });
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã lưu thông tin sức khỏe!'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Lỗi: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'LƯU',
+              style: AppTextStyles.buttonMedium.copyWith(
+                color: AppColors.textWhite,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -185,7 +389,7 @@ class ParentHomeScreen extends StatelessWidget {
                 label: 'Nhắn tin',
                 backgroundColor: AppColors.secondaryNavy,
                 onTap: () {
-                  // TODO: Implement message functionality
+                  _showMessageDialog(context);
                 },
               ),
             ),
@@ -299,6 +503,33 @@ class ParentHomeScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMessageDialog(BuildContext context) async {
+    // Lấy childId từ parentId field trong user document của parent
+    final authProvider = context.read<AuthProvider>();
+    final childId = authProvider.effectiveParentId; // Đây chính là childId
+    
+    if (childId == null || childId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa liên kết với con cái'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Navigate đến ChatScreen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          otherUserId: childId,
+          otherUserName: 'Con',
+        ),
       ),
     );
   }
@@ -419,11 +650,14 @@ class ParentHomeScreen extends StatelessWidget {
     
     final tasks = <Widget>[];
 
-    // Lấy thuốc hôm nay
+    // Lấy thuốc hôm nay (chỉ hiển thị chưa hoàn thành)
     if (medProvider.medications.isNotEmpty) {
       for (final med in medProvider.medications.take(3)) {
         final checkIn = medProvider.todayCheckIns.where((c) => c.medicationId == med.id).firstOrNull;
         final isCompleted = checkIn?.status == 'completed';
+        
+        // Bỏ qua nếu đã hoàn thành
+        if (isCompleted) continue;
         
         IconData icon = Icons.medication;
         Color color = const Color(0xFF7E57C2); // Tím
@@ -440,14 +674,12 @@ class ParentHomeScreen extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: _TaskItem(
               icon: icon,
-              iconColor: isCompleted ? AppColors.success : color,
+              iconColor: color,
               title: med.name,
-              subtitle: isCompleted ? 'Đã hoàn thành' : '${med.time} - Hôm nay',
-              isCompleted: isCompleted,
+              subtitle: '${med.time} - Hôm nay',
+              isCompleted: false,
               onTap: () {
-                if (!isCompleted) {
-                  _showCheckInConfirmation(context, med: med, medProvider: medProvider, authProvider: context.read<AuthProvider>());
-                }
+                _showCheckInConfirmation(context, med: med, medProvider: medProvider, authProvider: context.read<AuthProvider>());
               },
             ),
           ),
@@ -455,27 +687,28 @@ class ParentHomeScreen extends StatelessWidget {
       }
     }
 
-    // Lấy lịch khám sắp tới
+    // Lấy lịch khám sắp tới (chỉ hiển thị chưa hoàn thành)
     if (apptProvider.appointments.isNotEmpty && tasks.length < 5) {
       for (final appt in apptProvider.appointments.take(2)) {
+        final isCompleted = appt.status == 'completed';
+        
+        // Bỏ qua nếu đã hoàn thành
+        if (isCompleted) continue;
+        
         final daysLeft = appt.date.difference(DateTime.now()).inDays;
         final timeStr = daysLeft == 0 ? 'Hôm nay' : daysLeft == 1 ? 'Ngày mai' : 'Còn $daysLeft ngày';
-        
-        final isCompleted = appt.status == 'completed';
         
         tasks.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _TaskItem(
               icon: Icons.calendar_today,
-              iconColor: isCompleted ? AppColors.success : AppColors.accentOrange,
+              iconColor: AppColors.accentOrange,
               title: appt.title,
-              subtitle: isCompleted ? 'Đã hoàn thành' : timeStr,
-              isCompleted: isCompleted,
+              subtitle: timeStr,
+              isCompleted: false,
               onTap: () {
-                if (!isCompleted) {
-                  _showAppointmentConfirmation(context, appt: appt);
-                }
+                _showAppointmentConfirmation(context, appt: appt);
               },
             ),
           ),

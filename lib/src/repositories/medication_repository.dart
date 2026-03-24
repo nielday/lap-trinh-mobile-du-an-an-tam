@@ -114,4 +114,38 @@ class MedicationRepository {
       throw e;
     });
   }
+
+  /// Lấy check-ins trong khoảng thời gian cụ thể
+  Future<List<CheckInModel>> getCheckInsInRange(String parentId, DateTime start, DateTime end) async {
+    try {
+      debugPrint('=== getCheckInsInRange ===');
+      debugPrint('parentId: $parentId');
+      debugPrint('start: $start');
+      debugPrint('end: $end');
+      
+      // Lấy tất cả check-ins của parentId rồi filter trong code
+      final snap = await _checkIns
+          .where('parentId', isEqualTo: parentId)
+          .get();
+      
+      debugPrint('Total check-ins found: ${snap.docs.length}');
+      
+      final checkIns = snap.docs
+          .map((d) => CheckInModel.fromFirestore(d))
+          .where((checkIn) {
+            if (checkIn.timestamp == null) return false;
+            final isInRange = checkIn.timestamp!.isAfter(start.subtract(const Duration(days: 1))) && 
+                             checkIn.timestamp!.isBefore(end.add(const Duration(days: 1)));
+            return isInRange;
+          })
+          .toList()
+        ..sort((a, b) => (a.timestamp ?? DateTime(0)).compareTo(b.timestamp ?? DateTime(0)));
+      
+      debugPrint('Filtered check-ins: ${checkIns.length}');
+      return checkIns;
+    } catch (e) {
+      debugPrint('getCheckInsInRange error: $e');
+      return [];
+    }
+  }
 }

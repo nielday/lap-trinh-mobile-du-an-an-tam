@@ -3,6 +3,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/medication_provider.dart';
+import '../../../providers/appointment_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../repositories/user_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -36,11 +37,38 @@ class ParentTaskListScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Consumer<MedicationProvider>(
-        builder: (context, medProvider, _) {
+      body: Consumer2<MedicationProvider, AppointmentProvider>(
+        builder: (context, medProvider, apptProvider, _) {
           final meds = medProvider.medications;
+          final appts = apptProvider.appointments;
           
-          if (meds.isEmpty) {
+          // Tạo danh sách tất cả tasks (medications + appointments)
+          final allTasks = <Map<String, dynamic>>[];
+          
+          // Thêm medications
+          for (final med in meds) {
+            final checkIn = medProvider.todayCheckIns.where((c) => c.medicationId == med.id).firstOrNull;
+            final isCompleted = checkIn?.status == 'completed';
+            
+            allTasks.add({
+              'type': 'medication',
+              'data': med,
+              'isCompleted': isCompleted,
+            });
+          }
+          
+          // Thêm appointments
+          for (final appt in appts) {
+            final isCompleted = appt.status == 'completed';
+            
+            allTasks.add({
+              'type': 'appointment',
+              'data': appt,
+              'isCompleted': isCompleted,
+            });
+          }
+          
+          if (allTasks.isEmpty) {
             return Center(
               child: Text(
                 'Không có công việc nào.',
@@ -51,35 +79,57 @@ class ParentTaskListScreen extends StatelessWidget {
 
           return ListView.separated(
             padding: const EdgeInsets.all(20),
-            itemCount: meds.length,
+            itemCount: allTasks.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final med = meds[index];
-              final checkIn = medProvider.todayCheckIns.where((c) => c.medicationId == med.id).firstOrNull;
-              final isCompleted = checkIn?.status == 'completed';
+              final task = allTasks[index];
+              final type = task['type'] as String;
+              final isCompleted = task['isCompleted'] as bool;
+              
+              if (type == 'medication') {
+                final med = task['data'];
+                
+                IconData icon = Icons.medication;
+                Color color = const Color(0xFF7E57C2); // Tím
+                if (med.type == 'Bữa ăn') {
+                  icon = Icons.restaurant;
+                  color = const Color(0xFF66BB6A);
+                } else if (med.type == 'Hoạt động') {
+                  icon = Icons.directions_walk;
+                  color = const Color(0xFF42A5F5);
+                }
 
-              IconData icon = Icons.medication;
-              Color color = const Color(0xFF7E57C2); // Tím
-              if (med.type == 'Bữa ăn') {
-                icon = Icons.restaurant;
-                color = const Color(0xFF66BB6A);
-              } else if (med.type == 'Hoạt động') {
-                icon = Icons.directions_walk;
-                color = const Color(0xFF42A5F5);
+                return _TaskItem(
+                  icon: icon,
+                  iconColor: color,
+                  title: med.name,
+                  subtitle: isCompleted ? 'Đã hoàn thành' : '${med.time} - Hôm nay',
+                  isCompleted: isCompleted,
+                  onTap: () {
+                    if (!isCompleted) {
+                      _showCheckInConfirmation(context, med: med, medProvider: medProvider, authProvider: context.read<AuthProvider>());
+                    }
+                  },
+                );
+              } else {
+                // appointment
+                final appt = task['data'];
+                final daysLeft = appt.date.difference(DateTime.now()).inDays;
+                final timeStr = daysLeft == 0 ? 'Hôm nay' : daysLeft == 1 ? 'Ngày mai' : 'Còn $daysLeft ngày';
+                
+                return _TaskItem(
+                  icon: Icons.calendar_today,
+                  iconColor: AppColors.accentOrange,
+                  title: appt.title,
+                  subtitle: isCompleted ? 'Đã hoàn thành' : timeStr,
+                  isCompleted: isCompleted,
+                  onTap: () {
+                    if (!isCompleted) {
+                      _showAppointmentConfirmation(context, appt: appt);
+                    }
+                  },
+                );
               }
-
-              return _TaskItem(
-                icon: icon,
-                iconColor: color,
-                title: med.name,
-                subtitle: isCompleted ? 'Đã hoàn thành' : '${med.time} - Hôm nay',
-                isCompleted: isCompleted,
-                onTap: () {
-                  if (!isCompleted) {
-                    _showCheckInConfirmation(context, med: med, medProvider: medProvider, authProvider: context.read<AuthProvider>());
-                  }
-                },
-              );
             },
           );
         },
@@ -154,6 +204,76 @@ class ParentTaskListScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _showAppointmentConfirmation(BuildContext context, {required dynamic appt}) async {
+    if (!context.mounted) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Xác nhận khám bệnh',
+          style: AppTextStyles.heading3.copyWith(color: AppColors.textPrimary, fontSize: 22),
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'Bố/Mẹ ĐÃ đi khám "${appt.title}" rồi phải không ạ?',
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary, fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'CHƯA ĐI',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textLight, fontSize: 18),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'ĐÃ KHÁM',
+              style: AppTextStyles.buttonMedium.copyWith(color: AppColors.textWhite, fontSize: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await FirebaseFirestore.instance.collection('appointments').doc(appt.id).update({
+          'status': 'completed',
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tuyệt vời! Đã ghi nhận đi khám thành công.'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('appt check in error: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Lỗi khi cập nhật: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
   }
 }
 

@@ -52,4 +52,39 @@ class AppointmentRepository {
       throw Exception('Lỗi xóa lịch khám: ${e.message}');
     }
   }
+
+  /// Lấy appointments trong khoảng thời gian cụ thể
+  Future<List<AppointmentModel>> getAppointmentsInRange(String parentId, DateTime start, DateTime end) async {
+    try {
+      debugPrint('=== getAppointmentsInRange ===');
+      debugPrint('parentId: $parentId');
+      debugPrint('start: $start');
+      debugPrint('end: $end');
+      
+      // Lấy tất cả appointments của parentId rồi filter trong code
+      // Vì Firestore không cho phép 2 range queries mà không có composite index
+      final snap = await _appointments
+          .where('parentId', isEqualTo: parentId)
+          .get();
+      
+      debugPrint('Total appointments found: ${snap.docs.length}');
+      
+      final appointments = snap.docs
+          .map((d) => AppointmentModel.fromFirestore(d))
+          .where((appt) {
+            final isInRange = appt.date.isAfter(start.subtract(const Duration(days: 1))) && 
+                             appt.date.isBefore(end.add(const Duration(days: 1)));
+            debugPrint('  - ${appt.title}: ${appt.date} (in range: $isInRange, status: ${appt.status})');
+            return isInRange;
+          })
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+      
+      debugPrint('Filtered appointments: ${appointments.length}');
+      return appointments;
+    } catch (e) {
+      debugPrint('getAppointmentsInRange error: $e');
+      return [];
+    }
+  }
 }
