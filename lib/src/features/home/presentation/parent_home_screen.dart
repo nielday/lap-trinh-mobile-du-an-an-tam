@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
@@ -5,12 +6,17 @@ import 'parent_medication_reminder_screen.dart';
 import 'parent_task_list_screen.dart';
 import 'parent_settings_screen.dart';
 import 'parent_calling_screen.dart';
+import 'family_album_screen.dart';
+import 'photo_upload_screen.dart';
+import 'photo_detail_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../providers/medication_provider.dart';
 import '../../../providers/health_metric_provider.dart';
 import '../../../providers/appointment_provider.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/family_photo_provider.dart';
 import '../../../repositories/user_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -73,7 +79,7 @@ class ParentHomeScreen extends StatelessWidget {
               const SizedBox(height: 24),
               
               // Family album section
-              _buildFamilyAlbumSection(),
+              _buildFamilyAlbumSection(context),
             ],
           ),
         ),
@@ -529,7 +535,10 @@ class ParentHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFamilyAlbumSection() {
+  Widget _buildFamilyAlbumSection(BuildContext context) {
+    final photoProvider = context.watch<FamilyPhotoProvider>();
+    final photos = photoProvider.photos.take(2).toList();
+
     return Column(
       children: [
         Row(
@@ -545,7 +554,12 @@ class ParentHomeScreen extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                // TODO: Navigate to full album
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FamilyAlbumScreen(),
+                  ),
+                );
               },
               child: Text(
                 'Xem tất cả',
@@ -558,23 +572,69 @@ class ParentHomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _FamilyPhotoCard(
-                imageUrl: 'https://via.placeholder.com/150',
-                caption: 'Ảnh ông bà',
+        if (photoProvider.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (photos.isEmpty)
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhotoUploadScreen(),
+                ),
+              );
+            },
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.backgroundWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.indicatorInactive,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_photo_alternate, color: AppColors.textSecondary, size: 36),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Thêm ảnh đầu tiên',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _FamilyPhotoCard(
-                imageUrl: 'https://via.placeholder.com/150',
-                caption: 'Ảnh gia đình sum họp',
-              ),
-            ),
-          ],
-        ),
+          )
+        else
+          Row(
+            children: [
+              if (photos.isNotEmpty)
+                Expanded(
+                  child: _FamilyPhotoCard(
+                    photo: photos[0],
+                  ),
+                ),
+              if (photos.length > 1) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _FamilyPhotoCard(
+                    photo: photos[1],
+                  ),
+                ),
+              ],
+            ],
+          ),
       ],
     );
   }
@@ -982,39 +1042,74 @@ class _TaskItem extends StatelessWidget {
 /// Family photo card widget
 class _FamilyPhotoCard extends StatelessWidget {
   const _FamilyPhotoCard({
-    required this.imageUrl,
-    required this.caption,
+    required this.photo,
   });
 
-  final String imageUrl;
-  final String caption;
+  final dynamic photo;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            color: AppColors.backgroundWhite,
-            borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotoDetailScreen(photo: photo),
           ),
-          child: const Center(
-            child: Icon(Icons.photo, color: AppColors.textSecondary, size: 48),
+        );
+      },
+      child: Column(
+        children: [
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: AppColors.backgroundWhite,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: kIsWeb
+                  ? Image.network(
+                      photo.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stackTrace) => const Center(
+                        child: Icon(Icons.broken_image, color: AppColors.textSecondary, size: 48),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: photo.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(Icons.broken_image, color: AppColors.textSecondary, size: 48),
+                      ),
+                    ),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          caption,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.textSecondary,
-            fontSize: 12,
+          const SizedBox(height: 8),
+          Text(
+            photo.caption,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

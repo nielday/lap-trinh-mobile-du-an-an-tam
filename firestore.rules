@@ -53,6 +53,11 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // Family Photos collection
+    match /family_photos/{photoId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // Family links collection
     match /familyLinks/{linkId} {
       allow read: if isAuthenticated() && (

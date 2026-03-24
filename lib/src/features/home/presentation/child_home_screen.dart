@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../../../providers/auth_provider.dart';
@@ -8,9 +10,13 @@ import '../../../providers/medication_provider.dart';
 import '../../../providers/reminder_provider.dart';
 import '../../../providers/alert_provider.dart';
 import '../../../providers/appointment_provider.dart';
+import '../../../providers/family_photo_provider.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../schedule/presentation/schedule_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+import 'family_album_screen.dart';
+import 'photo_upload_screen.dart';
+import 'photo_detail_screen.dart';
 
 /// Child home screen - Main dashboard after login
 /// Uses a persistent bottom navbar with IndexedStack so tabs maintain their state.
@@ -82,6 +88,8 @@ class _DashboardTab extends StatelessWidget {
                     _buildRecentActivitiesSection(context),
                     const SizedBox(height: 24),
                     _buildWeeklyComplianceSection(context),
+                    const SizedBox(height: 24),
+                    _buildFamilyAlbumSection(context),
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -679,6 +687,109 @@ class _DashboardTab extends StatelessWidget {
       ],
     );
   }
+
+  // ── Family Album section ──────────────────────────────────────────────────
+
+  Widget _buildFamilyAlbumSection(BuildContext context) {
+    final photoProvider = context.watch<FamilyPhotoProvider>();
+    final photos = photoProvider.photos.take(4).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Album ảnh gia đình',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FamilyAlbumScreen(),
+                  ),
+                );
+              },
+              child: Text(
+                'Xem tất cả',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.primaryGreen,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (photoProvider.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (photos.isEmpty)
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhotoUploadScreen(),
+                ),
+              );
+            },
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.backgroundWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.indicatorInactive,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_photo_alternate, color: AppColors.textSecondary, size: 36),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Thêm ảnh gia đình',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1,
+            ),
+            itemCount: photos.length,
+            itemBuilder: (context, index) {
+              final photo = photos[index];
+              return _ChildPhotoCard(photo: photo);
+            },
+          ),
+      ],
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1233,6 +1344,106 @@ class _NavBarItem extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChildPhotoCard extends StatelessWidget {
+  const _ChildPhotoCard({required this.photo});
+
+  final dynamic photo;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotoDetailScreen(photo: photo),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              kIsWeb
+                  ? Image.network(
+                      photo.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: AppColors.backgroundWhite,
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: AppColors.textLight,
+                          size: 48,
+                        ),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: photo.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.backgroundWhite,
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: AppColors.backgroundWhite,
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: AppColors.textLight,
+                          size: 48,
+                        ),
+                      ),
+                    ),
+              // Gradient overlay for caption
+              if (photo.caption.isNotEmpty)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Text(
+                      photo.caption,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textWhite,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

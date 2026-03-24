@@ -6,6 +6,7 @@ import 'src/features/home/presentation/parent_home_screen.dart';
 import 'src/providers/alert_provider.dart';
 import 'src/providers/appointment_provider.dart';
 import 'src/providers/auth_provider.dart';
+import 'src/providers/family_photo_provider.dart';
 import 'src/providers/health_metric_provider.dart';
 import 'src/providers/medication_provider.dart';
 import 'src/providers/reminder_provider.dart';
@@ -71,6 +72,14 @@ class AnTamApp extends StatelessWidget {
           create: (_) => HealthMetricProvider(),
           update: (_, auth, prev) {
             final provider = prev ?? HealthMetricProvider();
+            provider.updateUser(parentId: auth.effectiveParentId);
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, FamilyPhotoProvider>(
+          create: (_) => FamilyPhotoProvider(),
+          update: (_, auth, prev) {
+            final provider = prev ?? FamilyPhotoProvider();
             provider.updateUser(parentId: auth.effectiveParentId);
             return provider;
           },
